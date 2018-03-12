@@ -1,11 +1,10 @@
 Description: >
-    ECS templates
+    ECS templates generalized.
 
 Parameters:
 
   CertificateARN:
     Description: Certificate of SSL for HTTPS
-    Default: "arn:aws:acm:us-west-2:202279780353:certificate/21662926-ccb1-4ee9-a026-b266a464eccc"
     Type: String
 
   StackEnv:
@@ -55,6 +54,7 @@ Parameters:
 
   DBMasterUserPassword:
     Description: The password for the master user for the database
+    Default: ferdinand_demo
     Type: String
     NoEcho: true
 
@@ -109,7 +109,7 @@ Resources:
   VPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/vpc.yaml
+      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/vpc.yaml
       Parameters:
         EnvironmentName:    !Ref AWS::StackName
         VpcCIDR:            10.24.0.0/16
@@ -144,7 +144,7 @@ Resources:
   STACKELB:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/elb.yaml
+      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/elb.yaml
       Parameters:
         EnvironmentName: !Sub ${AWS::StackName}-Client
         VPC: !GetAtt VPC.Outputs.VPC
@@ -166,7 +166,7 @@ Resources:
   STACKECS:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/ecs.yaml
+      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/ecs.yaml
       Parameters:
         EnvironmentName: !Sub ${AWS::StackName}-client
         InstanceType: !Ref InstanceType
@@ -186,11 +186,11 @@ Resources:
   STACKDB:
     Type: AWS::CloudFormation::Stack
     Properties:
-        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/rds.yml
+        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/rds.yml
         Parameters:
           EnvironmentName: !Sub ${AWS::StackName}-client
           VPC: !GetAtt VPC.Outputs.VPC
-          Subnet: !GetAtt VPC.Outputs.PrivateSubnets
+          Subnets: !GetAtt VPC.Outputs.PrivateSubnets
           VPCSecurityGroups: !Ref STACSG
           Engine: !Ref DBEngine
           DBName: !Ref DBName
@@ -202,18 +202,18 @@ Resources:
 
 #Cache
 #This template is for a cache instance of redis
-  STACKCACHE:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/cache_db.yaml
-        Parameters:
-          EnvironmentName: !Sub ${AWS::StackName}-client
-          CacheNodeType: !Ref CacheNodeType
-          ClusterName: !Ref CacheClusterName
-          Engine: !Ref CacheEngine
-          NumCacheNodes: !Ref CacheNumCacheNodes
-          VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-          VPCSecurityGroupsIds: !Ref STACSG
+  #STACKCACHE:
+  #  Type: AWS::CloudFormation::Stack
+  #  Properties:
+  #      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/cache_db.yaml
+  #      Parameters:
+  #        EnvironmentName: !Sub ${AWS::StackName}-client
+  #        CacheNodeType: !Ref CacheNodeType
+  #        ClusterName: !Ref CacheClusterName
+  #        Engine: !Ref CacheEngine
+  #        NumCacheNodes: !Ref CacheNumCacheNodes
+  #        VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
+  #        VPCSecurityGroupsIds: !Ref STACSG
 
 #Client service
 #this template is for a standar client service.
@@ -223,18 +223,24 @@ Resources:
   ClientService:
     Type: AWS::CloudFormation::Stack
     Properties:
-        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/client.yaml
+        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/client.yaml
         Parameters:
           VPC: !GetAtt VPC.Outputs.VPC
           Cluster: !Ref STACKECS
           DesiredCount: 2
           HttpListener: !GetAtt STACKELB.Outputs.HttpListener
-          HttpsListener: !GetAtt STACKELB.Outputs.HttpsListener
+          #HttpsListener: !GetAtt STACKELB.Outputs.HttpsListener
           DBName: !Ref DBName
           DBUser: !Ref DBMasterUsername
           DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
           DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
-          RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
-          RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
+          #RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
+          #RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
           ImageTag: !Ref ImageTag
           STACKENV: !Ref StackEnv
+
+Outputs:
+
+  URL:
+    Description: URL of demo
+    Value: !Ref STACKELB

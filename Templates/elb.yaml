@@ -21,9 +21,8 @@ Parameters:
         Type: AWS::EC2::SecurityGroup::Id
 
     CertificateArn:
-        Description: The ARN of aws certificate that will be used in LoadBalancer
-        Type: String
-        Default: arn:aws:acm:us-west-2:202279780353:certificate/a3019aa0-1233-4fa8-b0a6-3d06e2bc4443
+       Description: The ARN of aws certificate that will be used in LoadBalancer
+       Type: String
 
 
 Resources:
@@ -39,17 +38,17 @@ Resources:
                 - Key: Name
                   Value: !Ref EnvironmentName
 
-    HttpsLoadBalancerListener:
-        Type: AWS::ElasticLoadBalancingV2::Listener
-        Properties:
-            Certificates:
-                - CertificateArn: !Ref CertificateArn
-            LoadBalancerArn: !Ref LoadBalancer
-            Port: 443
-            Protocol: HTTPS
-            DefaultActions:
-                - Type: forward
-                  TargetGroupArn: !Ref DefaultTargetGroup
+    # HttpsLoadBalancerListener:
+    #     Type: AWS::ElasticLoadBalancingV2::Listener
+    #     Properties:
+    #         Certificates:
+    #             - CertificateArn: !Ref CertificateArn
+    #         LoadBalancerArn: !Ref LoadBalancer
+    #         Port: 443
+    #         Protocol: HTTPS
+    #         DefaultActions:
+    #             - Type: forward
+    #               TargetGroupArn: !Ref DefaultTargetGroup
 
     HttpLoadBalancerListener:
         Type: AWS::ElasticLoadBalancingV2::Listener
@@ -86,6 +85,6 @@ Outputs:
         Description: A reference to a port 80 listener
         Value: !Ref HttpLoadBalancerListener
 
-    HttpsListener:
-        Description: A reference to a port 443 listener
-        Value: !Ref HttpsLoadBalancerListener
+    # HttpsListener:
+    #     Description: A reference to a port 443 listener
+    #     Value: !Ref HttpsLoadBalancerListener

@@ -134,18 +134,18 @@ Resources:
             HealthyThresholdCount: 10
             UnhealthyThresholdCount: 10
 
-    HttpsListenerRule:
-        Type: AWS::ElasticLoadBalancingV2::ListenerRule
-        Properties:
-            ListenerArn: !Ref HttpsListener
-            Priority: 3
-            Conditions:
-                - Field: path-pattern
-                  Values:
-                    - !Ref Path
-            Actions:
-                - TargetGroupArn: !Ref TargetGroup
-                  Type: forward
+    # HttpsListenerRule:
+    #     Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    #     Properties:
+    #         ListenerArn: !Ref HttpsListener
+    #         Priority: 3
+    #         Conditions:
+    #             - Field: path-pattern
+    #               Values:
+    #                 - !Ref Path
+    #         Actions:
+    #             - TargetGroupArn: !Ref TargetGroup
+    #               Type: forward
 
     HttpListenerRule:
         Type: AWS::ElasticLoadBalancingV2::ListenerRule
