@@ -47,6 +47,11 @@ Parameters:
     STACKENV:
         Type: String
 
+    Path:
+        Description: The path to register with the Application Load Balancer
+        Type: String
+        Default: /*
+
 Resources:
 
     Service:
@@ -105,10 +110,10 @@ Resources:
                     awslogs-stream-prefix: ecs-demo-app
                 VolumesFrom:
                 - SourceContainer: simple-app
-              Volumes:
-              - Name: my-vol
+                Volumes:
+                  - Name: my-vol
 
-    CloudWatchLogsGroup:
+    CloudwatchLogsGroup:
         Type: AWS::Logs::LogGroup
         Properties:
             LogGroupName: !Ref AWS::StackName

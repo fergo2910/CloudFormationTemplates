@@ -35,9 +35,6 @@ Parameters:
   DBInstanceClass:
     Type: String
 
-  DBSize:
-    Type: String
-
   AllocatedStorage:
     Type: Number
 

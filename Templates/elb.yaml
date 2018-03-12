@@ -89,11 +89,3 @@ Outputs:
     HttpsListener:
         Description: A reference to a port 443 listener
         Value: !Ref HttpsLoadBalancerListener
-
-    FlowerListener:
-        Description: A reference to a port 5555 listener
-        Value: !Ref FlowerLoadBalancerListener
-
-    SonarqubeListener:
-        Description: A reference to a port 9000 listener
-        Value: !Ref SonarqubeLoadBalancerListener

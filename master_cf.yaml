@@ -4,57 +4,104 @@ Description: >
 Parameters:
 
   CertificateARN:
-    Type: String
+    Description: Certificate of SSL for HTTPS
     Default: "arn:aws:acm:us-west-2:202279780353:certificate/21662926-ccb1-4ee9-a026-b266a464eccc"
+    Type: String
 
   StackEnv:
+    Description: The enviroment that we are going to work on
+    Default: qa
     Type: String
     AllowedValues:
       - qa
       - prod
 
   ImageTag:
-    Type: String
+    Description: The tag that will be looked for
     Default: prod
+    Type: String
+
+#cluster configuration
+  InstanceType:
+      Description: Which instance type should we use to build the ECS cluster?
+      Default: t2.micro
+      Type: String
+
+  DesiredSize:
+      Description: Desired dumber of EC2 Instances in the ASG cannot be less than MinSize
+      Default: 2
+      Type: Number
+
+  MinSize:
+    Description: Minimum number of ECS Instances in the ASG
+    Default: 1
+    Type: Number
+
+  MaxSize:
+      Description: Maximum number of EC2 Instances in the ASG
+      Default: 3
+      Type: Number
+
+  KeyPair:
+      Description: Amazon EC2 Key Pair
+      Default: KeyFerdinand
+      Type: "AWS::EC2::KeyPair::KeyName"
 
 #database parameters if you need one
   DBMasterUsername:
+    Description: The database user name for the db instance
+    Default: demo
     Type: String
 
   DBMasterUserPassword:
+    Description: The password for the master user for the database
     Type: String
     NoEcho: true
 
   DBInstanceClass:
+    Description: Name of the compute and capacity clasess of the database
+    Default: db.t2.micro
     Type: String
 
   DBEngine:
+    Description: Database engine that the DB instance use.
+    Default: MySQL
     Type: String
 
   DBName:
+    Description: Name of the database provided at the time of creation
+    Default: demoDB
     Type: String
 
   DBInstanceIdentifier:
-    Type: String
-
-  DBSize:
+    Description: Name of the database
+    Default: demoDB
     Type: String
 
   DBAllocatedStorage:
+    Description: Allocated storage size fot the db (GB)
+    Default: 100
     Type: Number
 
 #cache database if you need on
   CacheNodeType:
     Description: The compute and memory capacity of nodes in a cache cluster.
+    Default: cache.t2.micro
     Type: String
 
   CacheEngine:
+    Description: Engine of the cache
+    Default: redis
     Type: String
 
   CacheClusterName:
+    Description: Name of the cache cluster.
+    Default: redisCache
     Type: String
 
   CacheNumCacheNodes:
+    Description: Number of nodes in the cache cluster.
+    Default: 1
     Type: Number
 
 Resources:
@@ -62,7 +109,7 @@ Resources:
   VPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/vpc.yaml
+      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/vpc.yaml
       Parameters:
         EnvironmentName:    !Ref AWS::StackName
         VpcCIDR:            10.24.0.0/16
@@ -97,7 +144,7 @@ Resources:
   STACKELB:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/elb.yaml
+      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/elb.yaml
       Parameters:
         EnvironmentName: !Sub ${AWS::StackName}-Client
         VPC: !GetAtt VPC.Outputs.VPC
@@ -119,14 +166,14 @@ Resources:
   STACKECS:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/ecs.yaml
+      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/ecs.yaml
       Parameters:
         EnvironmentName: !Sub ${AWS::StackName}-client
         InstanceType: !Ref InstanceType
-        MaxSize: !Ref ClusterSize
+        MaxSize: !Ref MaxSize
         MinSize: !Ref MinSize
         VPC: !GetAtt VPC.Outputs.VPC
-        SecurityGroup: !Ref CelerySecurityGroup
+        SecurityGroup: !Ref STACSG
         Subnets: !GetAtt VPC.Outputs.PrivateSubnets
         KeyPair: !Ref KeyPair
         Desired: !Ref DesiredSize
@@ -139,7 +186,7 @@ Resources:
   STACKDB:
     Type: AWS::CloudFormation::Stack
     Properties:
-        TemplateURL: https://s3.amazonaws.com/rds.yaml
+        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/rds.yml
         Parameters:
           EnvironmentName: !Sub ${AWS::StackName}-client
           VPC: !GetAtt VPC.Outputs.VPC
@@ -151,7 +198,6 @@ Resources:
           MasterUsername: !Ref DBMasterUsername
           MasterUserPassword: !Ref DBMasterUserPassword
           DBInstanceClass: !Ref DBInstanceClass
-          DBSize: !Ref DBSize
           AllocatedStorage: !Ref DBAllocatedStorage
 
 #Cache
@@ -159,7 +205,7 @@ Resources:
   STACKCACHE:
     Type: AWS::CloudFormation::Stack
     Properties:
-        TemplateURL: https://s3.amazonaws.com/cache_db.yaml
+        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/cache_db.yaml
         Parameters:
           EnvironmentName: !Sub ${AWS::StackName}-client
           CacheNodeType: !Ref CacheNodeType
@@ -177,18 +223,18 @@ Resources:
   ClientService:
     Type: AWS::CloudFormation::Stack
     Properties:
-        TemplateURL: https://s3.amazonaws.com/Client.yaml
+        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/Generalized+templates/Templates/client.yaml
         Parameters:
           VPC: !GetAtt VPC.Outputs.VPC
-          Cluster: !Ref ECS
+          Cluster: !Ref STACKECS
           DesiredCount: 2
           HttpListener: !GetAtt STACKELB.Outputs.HttpListener
           HttpsListener: !GetAtt STACKELB.Outputs.HttpsListener
           DBName: !Ref DBName
-          DBUser: !Ref DBUser
-          DBURL: !Ref STACKDB.Outputs.DBEndpointAddress
-          DBPort: !Ref STACKDB.Outputs.DBEndpointPort
-          RedisHost: !Ref STACKCACHE.Outputs.EndpointAddress
-          RedisPort: !Ref STACKCACHE.Outputs.EndpointPort
+          DBUser: !Ref DBMasterUsername
+          DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
+          DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
+          RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
+          RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
           ImageTag: !Ref ImageTag
           STACKENV: !Ref StackEnv
