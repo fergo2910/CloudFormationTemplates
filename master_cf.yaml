@@ -1,0 +1,194 @@
+Description: >
+    ECS templates
+
+Parameters:
+
+  CertificateARN:
+    Type: String
+    Default: "arn:aws:acm:us-west-2:202279780353:certificate/21662926-ccb1-4ee9-a026-b266a464eccc"
+
+  StackEnv:
+    Type: String
+    AllowedValues:
+      - qa
+      - prod
+
+  ImageTag:
+    Type: String
+    Default: prod
+
+#database parameters if you need one
+  DBMasterUsername:
+    Type: String
+
+  DBMasterUserPassword:
+    Type: String
+    NoEcho: true
+
+  DBInstanceClass:
+    Type: String
+
+  DBEngine:
+    Type: String
+
+  DBName:
+    Type: String
+
+  DBInstanceIdentifier:
+    Type: String
+
+  DBSize:
+    Type: String
+
+  DBAllocatedStorage:
+    Type: Number
+
+#cache database if you need on
+  CacheNodeType:
+    Description: The compute and memory capacity of nodes in a cache cluster.
+    Type: String
+
+  CacheEngine:
+    Type: String
+
+  CacheClusterName:
+    Type: String
+
+  CacheNumCacheNodes:
+    Type: Number
+
+Resources:
+
+  VPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/vpc.yaml
+      Parameters:
+        EnvironmentName:    !Ref AWS::StackName
+        VpcCIDR:            10.24.0.0/16
+        PublicSubnet1CIDR:  10.24.8.0/21
+        PublicSubnet2CIDR:  10.24.16.0/21
+        PrivateSubnet1CIDR: 10.24.24.0/21
+        PrivateSubnet2CIDR: 10.24.32.0/21
+
+#Secutiry Group
+#Services that allow us to enable trafic through ports/protocols
+  STACSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !GetAtt VPC.Outputs.VPC
+      GroupDescription: KEN SG for production enviroment
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Client
+
+#Elastic Load Balancer
+#This template enable trafic listeners on ports 80 and 443
+#Set a default target group for all listener, but you have to define the target group for each service (see client service)
+  STACKELB:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/elb.yaml
+      Parameters:
+        EnvironmentName: !Sub ${AWS::StackName}-Client
+        VPC: !GetAtt VPC.Outputs.VPC
+        Subnets: !GetAtt VPC.Outputs.PublicSubnets
+        CertificateArn: !Ref CertificateARN
+        SecurityGroup: !Ref STACSG
+
+#Cluster
+#This template creates a cluster with custom amis.
+  #Scale up +1 instance when:
+    #memory +98% for more than 1 minute
+    #CPU +90% for more than 1 minute
+  #Scale down -1 instance when:
+    #memory 45% for more than 3 minutes
+    #CPU 40% for more than 1 minute
+  #EC2 ROLE ECS ALLOW *
+  #Mappings amis, identifier is region specific.
+  #LaunchConfiguration is set to the mappings amis
+  STACKECS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/ecs.yaml
+      Parameters:
+        EnvironmentName: !Sub ${AWS::StackName}-client
+        InstanceType: !Ref InstanceType
+        MaxSize: !Ref ClusterSize
+        MinSize: !Ref MinSize
+        VPC: !GetAtt VPC.Outputs.VPC
+        SecurityGroup: !Ref CelerySecurityGroup
+        Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+        KeyPair: !Ref KeyPair
+        Desired: !Ref DesiredSize
+        ScaleUpTreshold: 80
+        ScaleDownTreshold: 40
+
+#Database
+#this template is for a standar rds service.
+#You can provide a new instance for the deployment if needed.
+  STACKDB:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+        TemplateURL: https://s3.amazonaws.com/rds.yaml
+        Parameters:
+          EnvironmentName: !Sub ${AWS::StackName}-client
+          VPC: !GetAtt VPC.Outputs.VPC
+          Subnet: !GetAtt VPC.Outputs.PrivateSubnets
+          VPCSecurityGroups: !Ref STACSG
+          Engine: !Ref DBEngine
+          DBName: !Ref DBName
+          DBInstanceIdentifier: !Ref DBInstanceIdentifier
+          MasterUsername: !Ref DBMasterUsername
+          MasterUserPassword: !Ref DBMasterUserPassword
+          DBInstanceClass: !Ref DBInstanceClass
+          DBSize: !Ref DBSize
+          AllocatedStorage: !Ref DBAllocatedStorage
+
+#Cache
+#This template is for a cache instance of redis
+  STACKCACHE:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+        TemplateURL: https://s3.amazonaws.com/cache_db.yaml
+        Parameters:
+          EnvironmentName: !Sub ${AWS::StackName}-client
+          CacheNodeType: !Ref CacheNodeType
+          ClusterName: !Ref CacheClusterName
+          Engine: !Ref CacheEngine
+          NumCacheNodes: !Ref CacheNumCacheNodes
+          VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
+          VPCSecurityGroupsIds: !Ref STACSG
+
+#Client service
+#this template is for a standar client service.
+#Importan parameters:
+  #DesiredCount - this parameter will have a default of 2 instances
+  #ImageTag - Image tag would search for an ami version with this tag
+  ClientService:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+        TemplateURL: https://s3.amazonaws.com/Client.yaml
+        Parameters:
+          VPC: !GetAtt VPC.Outputs.VPC
+          Cluster: !Ref ECS
+          DesiredCount: 2
+          HttpListener: !GetAtt STACKELB.Outputs.HttpListener
+          HttpsListener: !GetAtt STACKELB.Outputs.HttpsListener
+          DBName: !Ref DBName
+          DBUser: !Ref DBUser
+          DBURL: !Ref STACKDB.Outputs.DBEndpointAddress
+          DBPort: !Ref STACKDB.Outputs.DBEndpointPort
+          RedisHost: !Ref STACKCACHE.Outputs.EndpointAddress
+          RedisPort: !Ref STACKCACHE.Outputs.EndpointPort
+          ImageTag: !Ref ImageTag
+          STACKENV: !Ref StackEnv

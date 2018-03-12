@@ -40,29 +40,9 @@ Parameters:
     RedisPort:
         Type: String
 
-    DYNAMODBHOST:
-        Type: String
-
-    DYNAMODBREGION:
-        Type: String
-
-    DYNAMODBPORT:
-        Type: String
-
-    DYNAMODBCLOUDTRAILTABLE:
-        Type: String
-
-    DYNAMODBPAGERDUTYTABLE:
-        Type: String
-
     ImageTag:
         Description: The tag to be used
         Type: String
-
-    IamRole:
-        Description: the iam role to use in the tasks
-        Type: String
-        Default: "arn:aws:iam::202279780353:role/nOpsRole"
 
     STACKENV:
         Type: String
@@ -87,70 +67,46 @@ Resources:
     TaskDefinition:
         Type: AWS::ECS::TaskDefinition
         Properties:
-            TaskRoleArn: !Ref IamRole
             ContainerDefinitions:
-                - Name: client
-                  Command:
-                      - "/bin/bash"
-                      - "-c"
-                      - "source /get-secrets.sh; /var/www/html/ken.sh;"
-                  Essential: true
-                  Image: !Sub ami.us-west-2.amazonaws.com/client:${ImageTag}
-                  Memory: 2048
-                  Environment:
-                    - Name: DEFAULT_DB_NAME
-                      Value: !Ref DBName
-                    - Name: DEFAULT_DB_USER
-                      Value: !Ref DBUser
-
-                    - Name: CACHE_LOCATION
-                      Value: !Ref RedisHost
-
-                    - Name: db_name
-                      Value: !Ref DBName
-                    - Name: db_user
-                      Value: !Ref DBUser
-                    - Name: db_url
-                      Value: !Ref DBURL
-
-                    - Name: redis_url
-                      Value: !Sub ${RedisHost}:${RedisPort}
-                    - Name: cache_timeout
-                      Value: 10
-                    - Name: django_log_file
-                      Value: /var/www/virtualenv/ken/logs/gunicorn_supervisor.log
-                    - Name: keyset_dir
-                      Value: /django/.ken/keyset
-
-                    - Name: is_dynamodb_local
-                      Value: 0
-                    - Name: dynamodb_host
-                      Value: !Ref DYNAMODBHOST
-                    - Name: dynamodb_region
-                      Value: !Ref DYNAMODBREGION
-                    - Name: dynamodb_port
-                      Value: !Ref DYNAMODBPORT
-                    - Name: dynamodb_cloudtrail_table
-                      Value: !Ref DYNAMODBCLOUDTRAILTABLE
-                    - Name: dynamodb_pagerduty_table
-                      Value: !Ref DYNAMODBPAGERDUTYTABLE
-                    - Name: redis_host
-                      Value: !Ref RedisHost
-                    - Name: redis_port
-                      Value: !Ref RedisPort
-                    - Name: app_admin_email
-                      Value: a@a.com
-                    - Name: secure_ssl_redirect
-                      Value: 1
-                    - Name: ken_env
-                      Value: !Ref STACKENV
-                  PortMappings:
-                    - ContainerPort: 80
-                  LogConfiguration:
-                    LogDriver: awslogs
-                    Options:
-                        awslogs-group: !Ref AWS::StackName
-                        awslogs-region: !Ref AWS::Region
+              - Name: simple-app
+                Cpu: '10'
+                Essential: 'true'
+                Image: httpd:2.4
+                Memory: '300'
+                LogConfiguration:
+                  LogDriver: awslogs
+                  Options:
+                    awslogs-group: !Ref 'CloudwatchLogsGroup'
+                    awslogs-region: !Ref 'AWS::Region'
+                    awslogs-stream-prefix: ecs-demo-app
+                MountPoints:
+                - ContainerPath: /usr/local/apache2/htdocs
+                  SourceVolume: my-vol
+                PortMappings:
+                - ContainerPort: 80
+              - Name: busybox
+                Cpu: 10
+                Command: ['/bin/sh -c "while true; do echo ''<html> <head> <title>Amazon ECS EC2
+                    Sample App</title> <style>body {margin-top: 40px; background-color: #333;}
+                    </style> </head><body> <div style=color:white;text-align:center> <h1>Amazon
+                    ECS EC2 Sample App</h1> <h2>Congratulations!</h2> <p>Your application is now
+                    running on a container in Amazon ECS.</p>'' > top; /bin/date > date ;
+                    echo ''</div></body></html>'' > bottom; cat top date bottom > /usr/local/apache2/htdocs/index.html
+                    ; sleep 1; done"']
+                EntryPoint: [sh, -c]
+                Essential: false
+                Image: busybox
+                Memory: 200
+                LogConfiguration:
+                  LogDriver: awslogs
+                  Options:
+                    awslogs-group: !Ref 'CloudwatchLogsGroup'
+                    awslogs-region: !Ref 'AWS::Region'
+                    awslogs-stream-prefix: ecs-demo-app
+                VolumesFrom:
+                - SourceContainer: simple-app
+              Volumes:
+              - Name: my-vol
 
     CloudWatchLogsGroup:
         Type: AWS::Logs::LogGroup

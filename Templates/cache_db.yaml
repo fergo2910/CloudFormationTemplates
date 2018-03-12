@@ -1,20 +1,27 @@
-AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+    ECS templates
 
 Parameters:
   EnvironmentName:
     Type: String
+
   CacheNodeType:
     Type: String
     Default: cache.t2.micro
+
   ClusterName:
     Type: String
+
   Engine:
     Type: String
+
   NumCacheNodes:
     Type: Number
     Default: 1
+
   VPCSubnetsIds:
     Type: List<AWS::EC2::Subnet::Id>
+
   VPCSecurityGroupsIds:
     Type: List<AWS::EC2::SecurityGroup::Id>
 
@@ -28,6 +35,7 @@ Resources:
       CacheSubnetGroupName: !Sub ${EnvironmentName}-CacheSubnetGroup
       Description: Subnet group for the ElastiCache cluster
       SubnetIds: !Ref VPCSubnetsIds
+
   CacheCluster:
     Type: "AWS::ElastiCache::CacheCluster"
     Properties:
@@ -45,6 +53,7 @@ Outputs:
   CacheCluster:
       Description: A reference to the cache cluster
       Value: !Ref CacheCluster
+
   EndpointAddress:
     Description: The DNS address of the configuration endpoint for the cache cluster.
     Value:
