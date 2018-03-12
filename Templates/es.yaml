@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  DomainName:
+    Type: String
+  EnvironmentName:
+    Type: String
+  EBSEnabled:
+    Type: String
+    Default: false
+  Iops:
+    Type: Number
+    Default: 0
+  VolumeSize:
+    Type: Number
+    Default: 20
+  VolumeType:
+    Type: String
+    Default: gp2
+  DedicatedMasterEnabled:
+    Type: String
+    Default: true
+  InstanceCount:
+    Type: Number
+    Default: 1
+  ZoneAwarenessEnabled:
+    Type: String
+    Default: false
+  InstanceType:
+    Type: String
+    Default: m3.medium.elasticsearch
+  DedicatedMasterType:
+    Type: String
+    Default: m3.medium.elasticsearch
+  DedicatedMasterCount:
+    Type: Number
+    Default: 3
+  AutomatedSnapshotStartHour:
+    Type: Number
+    Default: 0
+
+Conditions:
+  IsEBSEnabled: !Equals [!Ref EBSEnabled, true]
+
+Resources:
+  ElasticsearchDomain:
+    Type: "AWS::Elasticsearch::Domain"
+    Properties:
+      AccessPolicies: {"Version": "2012-10-17","Statement": [{"Effect": "Allow","Principal": {"AWS": "*"},"Action": "es:*","Resource": "*" }]}
+      AdvancedOptions:
+         rest.action.multi.allow_explicit_index: true
+      DomainName: !Ref DomainName
+      EBSOptions:
+        !If
+          - IsEBSEnabled
+          - EBSEnabled: !Ref EBSEnabled
+            Iops: !Ref Iops
+            VolumeSize: !Ref VolumeSize
+            VolumeType: !Ref VolumeType
+          - EBSEnabled: !Ref "AWS::NoValue"
+      ElasticsearchClusterConfig:
+        DedicatedMasterEnabled: !Ref DedicatedMasterEnabled
+        InstanceCount: !Ref InstanceCount
+        ZoneAwarenessEnabled: !Ref ZoneAwarenessEnabled
+        InstanceType: !Ref InstanceType
+        DedicatedMasterType: !Ref DedicatedMasterType
+        DedicatedMasterCount: !Ref DedicatedMasterCount
+      SnapshotOptions:
+        AutomatedSnapshotStartHour: !Ref AutomatedSnapshotStartHour
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-Elasticsearch
+
+Outputs:
+
+    ElasticsearchDomain:
+        Description: A reference to the created Elasticsearch Domain
+        Value: !Ref ElasticsearchDomain
+    DomainArn:
+      Description: DomainArn
+      Value: !GetAtt ElasticsearchDomain.DomainArn
+    DomainEndpoint:
+      Description: Endpoint for the domain
+      Value: !GetAtt ElasticsearchDomain.DomainEndpoint

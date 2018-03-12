@@ -1,0 +1,275 @@
+Description: >
+    This template deploys an ECS cluster to the provided VPC and subnets
+    using an Auto Scaling Group
+
+Parameters:
+
+    EnvironmentName:
+        Description: An environment name that will be prefixed to resource names
+        Type: String
+
+    InstanceType:
+        Description: Which instance type should we use to build the ECS cluster?
+        Type: String
+
+    VPC:
+        Description: Choose which VPC this ECS cluster should be deployed to
+        Type: AWS::EC2::VPC::Id
+
+    Subnets:
+        Description: Choose which subnets this ECS cluster should be deployed to
+        Type: List<AWS::EC2::Subnet::Id>
+
+    SecurityGroup:
+        Description: Select the Security Group to use for the ECS cluster hosts
+        Type: AWS::EC2::SecurityGroup::Id
+
+    KeyPair:
+        Description: Amazon EC2 Key Pair
+        Type: "AWS::EC2::KeyPair::KeyName"
+
+    MinSize:
+        Type: Number
+        Description: Minimum number of ECS Instances in the ASG
+
+    MaxSize:
+        Type: Number
+        Description: Maximum number of EC2 Instances in the ASG
+
+    Desired:
+        Type: Number
+        Description: Desired dumber of EC2 Instances in the ASG cannot be less than MinSize
+
+    ScaleUpTreshold:
+        Type: Number
+        Description: The percentage of memory to scale up
+
+    ScaleDownTreshold:
+        Type: Number
+        Description: The percentage of memory to scale down
+
+Mappings:
+
+    # These are the latest ECS optimized AMIs as of January 2018:
+    #
+    #   amzn-ami-2016.03.h-amazon-ecs-optimized
+    #   ECS agent:    1.16.1
+    #   Docker:       17.06.2-ce
+    #   ecs-init:     1.16.1-1
+    #
+    # You can find the latest available on this page of our documentation:
+    # http://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html
+    # (note the AMI identifier is region specific)
+    AWSRegionToAMI:
+      us-east-1:
+        AMI: ami-ba722dc0
+      us-east-2:
+        AMI: ami-13af8476
+      us-west-1:
+        AMI: ami-9df0f0fd
+      us-west-2:
+        AMI: ami-c9c87cb1
+
+Resources:
+
+    ECSCluster:
+        Type: AWS::ECS::Cluster
+        Properties:
+            ClusterName: !Ref EnvironmentName
+
+    ECSAutoScalingGroup:
+        Type: AWS::AutoScaling::AutoScalingGroup
+        Properties:
+            VPCZoneIdentifier: !Ref Subnets
+            LaunchConfigurationName: !Ref ECSLaunchConfiguration
+            MinSize: !Ref MinSize
+            MaxSize: !Ref MaxSize
+            DesiredCapacity: !Ref Desired
+            TerminationPolicies:
+                - Default
+            Tags:
+                - Key: Name
+                  Value: !Sub ${EnvironmentName} ECS host
+                  PropagateAtLaunch: true
+        CreationPolicy:
+            ResourceSignal:
+                Timeout: PT15M
+        UpdatePolicy:
+            AutoScalingRollingUpdate:
+                MinInstancesInService: 1
+                MaxBatchSize: 1
+                PauseTime: PT15M
+                WaitOnResourceSignals: true
+
+    ScaleUpPolicy:
+        Type: AWS::AutoScaling::ScalingPolicy
+        Properties:
+            AdjustmentType: ChangeInCapacity
+            AutoScalingGroupName: !Ref ECSAutoScalingGroup
+            EstimatedInstanceWarmup: 300
+            MetricAggregationType: Average
+            PolicyType: StepScaling
+            StepAdjustments:
+            # The X bound is the difference between the breach threshold and the
+            # aggregated CloudWatch metric value
+                 - MetricIntervalLowerBound: "0"
+                   ScalingAdjustment: "1"
+
+    ScaleDownPolicy:
+        Type: AWS::AutoScaling::ScalingPolicy
+        Properties:
+            AdjustmentType: ChangeInCapacity
+            AutoScalingGroupName: !Ref ECSAutoScalingGroup
+            EstimatedInstanceWarmup: 300
+            MetricAggregationType: Average
+            PolicyType: StepScaling
+            StepAdjustments:
+            # The X bound is the difference between the breach threshold and the
+            # aggregated CloudWatch metric value
+                  - MetricIntervalUpperBound: "0"
+                    ScalingAdjustment: "-1"
+
+    MemoryScaleUpAlarm:
+        Type: "AWS::CloudWatch::Alarm"
+        Properties:
+            ActionsEnabled: true
+            AlarmActions:
+            - !Ref ScaleUpPolicy
+            AlarmDescription: >
+                The MemoryReservation of the ECS cluster has exceeded 98% for more than
+                one minute. Breaching this alarm should trigger an ASG scale out.
+            ComparisonOperator: GreaterThanOrEqualToThreshold
+            Dimensions:
+            - Name: ClusterName
+              Value: !Ref ECSCluster
+            EvaluationPeriods: "1"
+            MetricName: MemoryReservation
+            Namespace: AWS/ECS
+            Period: "60"
+            Statistic: Average
+            Threshold: !Ref ScaleUpTreshold
+            Unit: Percent
+
+    MemoryScaleDownAlarm:
+        Type: "AWS::CloudWatch::Alarm"
+        Properties:
+            ActionsEnabled: true
+            AlarmActions:
+            - !Ref ScaleDownPolicy
+            AlarmDescription: >
+                The MemoryReservation of the ECS cluster has dropped below 45% for more
+                than three minutes. Breaching this alarm should trigger an ASG scale in.
+            ComparisonOperator: LessThanOrEqualToThreshold
+            Dimensions:
+            - Name: ClusterName
+              Value: !Ref ECSCluster
+            EvaluationPeriods: "3"
+            MetricName: MemoryReservation
+            Namespace: AWS/ECS
+            Period: "60"
+            Statistic: Average
+            Threshold: !Ref ScaleDownTreshold
+            Unit: Percent
+
+    CPUScaleUpAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Scale Up ecs instance
+            ActionsEnabled: true
+            AlarmActions:
+            - Ref: ScaleUpPolicy
+            MetricName: CPUUtilization
+            Namespace: AWS/ECS
+            Statistic: Average
+            Period: '60'
+            EvaluationPeriods: '1'
+            Threshold: '90'
+            ComparisonOperator: GreaterThanThreshold
+
+    CPUScaleDownAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Scale Down ecs instance
+            ActionsEnabled: true
+            AlarmActions:
+            - Ref: ScaleDownPolicy
+            MetricName: CPUUtilization
+            Namespace: AWS/ECS
+            Statistic: Average
+            Period: '60'
+            EvaluationPeriods: '1'
+            Threshold: '40'
+            ComparisonOperator: LessThanThreshold
+
+
+    ECSLaunchConfiguration:
+        Type: AWS::AutoScaling::LaunchConfiguration
+        Properties:
+            ImageId:  !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
+            InstanceType: !Ref InstanceType
+            KeyName: !Ref KeyPair
+            SecurityGroups:
+                - !Ref SecurityGroup
+            IamInstanceProfile: !Ref ECSInstanceProfile
+
+    # This IAM Role is attached to all of the ECS hosts. It is based on the default role
+    # published here:
+    # http://docs.aws.amazon.com/AmazonECS/latest/developerguide/instance_IAM_role.html
+    #
+    # You can add other IAM policy statements here to allow access from your ECS hosts
+    # to other AWS services. Please note that this role will be used by ALL containers
+    # running on the ECS host.
+    #
+    ECSRole:
+        Type: AWS::IAM::Role
+        Properties:
+            Path: /
+            RoleName: !Sub ${EnvironmentName}-ECSRole-${AWS::Region}
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        }
+                    }]
+                }
+            Policies:
+                - PolicyName: ecs-service
+                  PolicyDocument: |
+                    {
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecs:CreateCluster",
+                                "ecs:DeregisterContainerInstance",
+                                "ecs:DiscoverPollEndpoint",
+                                "ecs:Poll",
+                                "ecs:RegisterContainerInstance",
+                                "ecs:StartTelemetrySession",
+                                "ecs:Submit*",
+                                "ecr:*",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents",
+                                "ecr:BatchCheckLayerAvailability",
+                                "ecr:BatchGetImage",
+                                "ecr:GetDownloadUrlForLayer",
+                                "ecr:GetAuthorizationToken"
+                            ],
+                            "Resource": "*"
+                        }]
+                    }
+
+    ECSInstanceProfile:
+        Type: AWS::IAM::InstanceProfile
+        Properties:
+            Path: /
+            Roles:
+                - !Ref ECSRole
+
+Outputs:
+
+    Cluster:
+        Description: A reference to the ECS cluster
+        Value: !Ref ECSCluster

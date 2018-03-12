@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+  CacheNodeType:
+    Type: String
+    Default: cache.t2.micro
+  ClusterName:
+    Type: String
+  Engine:
+    Type: String
+  NumCacheNodes:
+    Type: Number
+    Default: 1
+  VPCSubnetsIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  VPCSecurityGroupsIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+
+Conditions:
+  IsRedis: !Equals [!Ref Engine, redis]
+
+Resources:
+  SubnetGroup:
+    Type: "AWS::ElastiCache::SubnetGroup"
+    Properties:
+      CacheSubnetGroupName: !Sub ${EnvironmentName}-CacheSubnetGroup
+      Description: Subnet group for the ElastiCache cluster
+      SubnetIds: !Ref VPCSubnetsIds
+  CacheCluster:
+    Type: "AWS::ElastiCache::CacheCluster"
+    Properties:
+      CacheNodeType: !Ref CacheNodeType
+      CacheSubnetGroupName: !Sub ${EnvironmentName}-CacheSubnetGroup
+      ClusterName: !Ref ClusterName
+      Engine: !Ref Engine
+      NumCacheNodes: !Ref NumCacheNodes
+      VpcSecurityGroupIds: !Ref VPCSecurityGroupsIds
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-ElastiCacheCluster
+
+Outputs:
+  CacheCluster:
+      Description: A reference to the cache cluster
+      Value: !Ref CacheCluster
+  EndpointAddress:
+    Description: The DNS address of the configuration endpoint for the cache cluster.
+    Value:
+      !If
+        - IsRedis
+        - !GetAtt CacheCluster.RedisEndpoint.Address
+        - !GetAtt CacheCluster.ConfigurationEndpoint.Address
+  EndpointPort:
+    Description: The port number of the configuration endpoint for the cache cluster.
+    Value:
+      !If
+        - IsRedis
+        - !GetAtt CacheCluster.RedisEndpoint.Port
+        - !GetAtt CacheCluster.ConfigurationEndpoint.Port

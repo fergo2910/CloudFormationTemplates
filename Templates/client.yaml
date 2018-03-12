@@ -1,0 +1,238 @@
+Description: >
+    This is an example of a long running ECS service that needs to connect to another ECS service (product-service)
+    via it's load balancer. We use environment variables to pass the URL of the product-service to this one's container(s).
+
+Parameters:
+
+    VPC:
+        Description: The VPC that the ECS cluster is deployed to
+        Type: AWS::EC2::VPC::Id
+
+    Cluster:
+        Description: Please provide the ECS Cluster ID that this service should run on
+        Type: String
+
+    DesiredCount:
+        Description: How many instances of this task should we run across our cluster?
+        Type: Number
+        Default: 2
+
+    HttpListener:
+        Description: The Application Load Balancer listener to register with
+        Type: String
+
+    HttpsListener:
+        Description: The Application Load Balancer listener to register with
+        Type: String
+
+    DBName:
+        Type: String
+
+    DBUser:
+        Type: String
+
+    DBURL:
+        Type: String
+
+    RedisHost:
+        Type: String
+
+    RedisPort:
+        Type: String
+
+    DYNAMODBHOST:
+        Type: String
+
+    DYNAMODBREGION:
+        Type: String
+
+    DYNAMODBPORT:
+        Type: String
+
+    DYNAMODBCLOUDTRAILTABLE:
+        Type: String
+
+    DYNAMODBPAGERDUTYTABLE:
+        Type: String
+
+    ImageTag:
+        Description: The tag to be used
+        Type: String
+
+    IamRole:
+        Description: the iam role to use in the tasks
+        Type: String
+        Default: "arn:aws:iam::202279780353:role/nOpsRole"
+
+    STACKENV:
+        Type: String
+
+Resources:
+
+    Service:
+        Type: AWS::ECS::Service
+        Properties:
+            Cluster: !Ref Cluster
+            Role: !Ref ServiceRole
+            DesiredCount: !Ref DesiredCount
+            TaskDefinition: !Ref TaskDefinition
+            DeploymentConfiguration:
+                MaximumPercent: 200
+                MinimumHealthyPercent: 100
+            LoadBalancers:
+                - ContainerName: "client"
+                  ContainerPort: 80
+                  TargetGroupArn: !Ref TargetGroup
+
+    TaskDefinition:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            TaskRoleArn: !Ref IamRole
+            ContainerDefinitions:
+                - Name: client
+                  Command:
+                      - "/bin/bash"
+                      - "-c"
+                      - "source /get-secrets.sh; /var/www/html/ken.sh;"
+                  Essential: true
+                  Image: !Sub ami.us-west-2.amazonaws.com/client:${ImageTag}
+                  Memory: 2048
+                  Environment:
+                    - Name: DEFAULT_DB_NAME
+                      Value: !Ref DBName
+                    - Name: DEFAULT_DB_USER
+                      Value: !Ref DBUser
+
+                    - Name: CACHE_LOCATION
+                      Value: !Ref RedisHost
+
+                    - Name: db_name
+                      Value: !Ref DBName
+                    - Name: db_user
+                      Value: !Ref DBUser
+                    - Name: db_url
+                      Value: !Ref DBURL
+
+                    - Name: redis_url
+                      Value: !Sub ${RedisHost}:${RedisPort}
+                    - Name: cache_timeout
+                      Value: 10
+                    - Name: django_log_file
+                      Value: /var/www/virtualenv/ken/logs/gunicorn_supervisor.log
+                    - Name: keyset_dir
+                      Value: /django/.ken/keyset
+
+                    - Name: is_dynamodb_local
+                      Value: 0
+                    - Name: dynamodb_host
+                      Value: !Ref DYNAMODBHOST
+                    - Name: dynamodb_region
+                      Value: !Ref DYNAMODBREGION
+                    - Name: dynamodb_port
+                      Value: !Ref DYNAMODBPORT
+                    - Name: dynamodb_cloudtrail_table
+                      Value: !Ref DYNAMODBCLOUDTRAILTABLE
+                    - Name: dynamodb_pagerduty_table
+                      Value: !Ref DYNAMODBPAGERDUTYTABLE
+                    - Name: redis_host
+                      Value: !Ref RedisHost
+                    - Name: redis_port
+                      Value: !Ref RedisPort
+                    - Name: app_admin_email
+                      Value: a@a.com
+                    - Name: secure_ssl_redirect
+                      Value: 1
+                    - Name: ken_env
+                      Value: !Ref STACKENV
+                  PortMappings:
+                    - ContainerPort: 80
+                  LogConfiguration:
+                    LogDriver: awslogs
+                    Options:
+                        awslogs-group: !Ref AWS::StackName
+                        awslogs-region: !Ref AWS::Region
+
+    CloudWatchLogsGroup:
+        Type: AWS::Logs::LogGroup
+        Properties:
+            LogGroupName: !Ref AWS::StackName
+            RetentionInDays: 365
+
+    TargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            VpcId: !Ref VPC
+            Port: 80
+            Protocol: HTTP
+            Matcher:
+                HttpCode: 200-499
+            HealthCheckPath: /auth/login/
+            HealthCheckProtocol: HTTP
+            HealthCheckIntervalSeconds: 20
+            HealthCheckTimeoutSeconds: 10
+            HealthyThresholdCount: 10
+            UnhealthyThresholdCount: 10
+
+    HttpsListenerRule:
+        Type: AWS::ElasticLoadBalancingV2::ListenerRule
+        Properties:
+            ListenerArn: !Ref HttpsListener
+            Priority: 3
+            Conditions:
+                - Field: path-pattern
+                  Values:
+                    - !Ref Path
+            Actions:
+                - TargetGroupArn: !Ref TargetGroup
+                  Type: forward
+
+    HttpListenerRule:
+        Type: AWS::ElasticLoadBalancingV2::ListenerRule
+        Properties:
+            ListenerArn: !Ref HttpListener
+            Priority: 3
+            Conditions:
+                - Field: path-pattern
+                  Values:
+                    - !Ref Path
+            Actions:
+                - TargetGroupArn: !Ref TargetGroup
+                  Type: forward
+
+    # This IAM Role grants the service access to register/unregister with the
+    # Application Load Balancer (ALB). It is based on the default documented here:
+    # http://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_IAM_role.html
+    ServiceRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub ecs-service-${AWS::StackName}
+            Path: /
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": { "Service": [ "ecs.amazonaws.com" ]},
+                        "Action": [ "sts:AssumeRole" ]
+                    }]
+                }
+            Policies:
+                - PolicyName: !Sub ecs-service-${AWS::StackName}
+                  PolicyDocument:
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [{
+                                "Effect": "Allow",
+                                "Action": [
+                                    "ec2:AuthorizeSecurityGroupIngress",
+                                    "ec2:Describe*",
+                                    "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                                    "elasticloadbalancing:Describe*",
+                                    "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                                    "elasticloadbalancing:DeregisterTargets",
+                                    "elasticloadbalancing:DescribeTargetGroups",
+                                    "elasticloadbalancing:DescribeTargetHealth",
+                                    "elasticloadbalancing:RegisterTargets"
+                                ],
+                                "Resource": "*"
+                        }]
+                    }
