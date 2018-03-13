@@ -137,7 +137,7 @@ Resources:
                 -   Key: Name
                     Value: !Sub ${AWS::StackName}-Client
 
-    STACKSG_ECS:
+    STACKSGECS:
         Type: AWS::EC2::SecurityGroup
         Properties:
             VpcId: !GetAtt VPC.Outputs.VPC
@@ -184,7 +184,7 @@ Resources:
                 MaxSize: !Ref MaxSize
                 MinSize: !Ref MinSize
                 VPC: !GetAtt VPC.Outputs.VPC
-                SecurityGroup: !Ref STACKSG_ECS
+                SecurityGroup: !Ref STACKSGECS
                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
                 KeyPair: !Ref KeyPair
                 Desired: !Ref DesiredSize
@@ -202,7 +202,7 @@ Resources:
                 EnvironmentName: !Sub ${AWS::StackName}-client
                 VPC: !GetAtt VPC.Outputs.VPC
                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-                VPCSecurityGroups: !Ref STACKSG_ECS
+                VPCSecurityGroups: !Ref STACKSGECS
                 Engine: !Ref DBEngine
                 DBName: !Ref DBName
                 DBInstanceIdentifier: !Ref DBInstanceIdentifier
@@ -224,7 +224,7 @@ Resources:
                 Engine: !Ref CacheEngine
                 NumCacheNodes: !Ref CacheNumCacheNodes
                 VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-                VPCSecurityGroupsIds: !Ref STACKSG_ECS
+                VPCSecurityGroupsIds: !Ref STACKSGECS
 
 #Client service
 #this template is for a standar client service.
