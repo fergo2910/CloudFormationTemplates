@@ -128,7 +128,7 @@ Resources:
             Protocol: HTTP
             Matcher:
                 HttpCode: 200-499
-            HealthCheckPath: /auth/login/
+            HealthCheckPath: /
             HealthCheckProtocol: HTTP
             HealthCheckIntervalSeconds: 20
             HealthCheckTimeoutSeconds: 10

@@ -119,11 +119,11 @@ Resources:
 
 #Secutiry Group
 #Services that allow us to enable trafic through ports/protocols
-    STACSG:
+    STACKSG:
         Type: AWS::EC2::SecurityGroup
         Properties:
             VpcId: !GetAtt VPC.Outputs.VPC
-            GroupDescription: KEN SG for production enviroment
+            GroupDescription: SG for production enviroment
             SecurityGroupIngress:
                 -   IpProtocol: tcp
                     FromPort: '443'
@@ -133,6 +133,18 @@ Resources:
                     FromPort: '80'
                     ToPort: '80'
                     CidrIp: "0.0.0.0/0"
+            Tags:
+                -   Key: Name
+                    Value: !Sub ${AWS::StackName}-Client
+
+    STACKSG_ECS:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            VpcId: !GetAtt VPC.Outputs.VPC
+            GroupDescription: SG for ELB TO EC2
+            SecurityGroupIngress:
+                -   IpProtocol: -1
+                    SourceSecurityGroupId: !Ref STACKSG
             Tags:
                 -   Key: Name
                     Value: !Sub ${AWS::StackName}-Client
@@ -149,7 +161,7 @@ Resources:
                 VPC: !GetAtt VPC.Outputs.VPC
                 Subnets: !GetAtt VPC.Outputs.PublicSubnets
                 CertificateArn: !Ref CertificateARN
-                SecurityGroup: !Ref STACSG
+                SecurityGroup: !Ref STACKSG
 
 #Cluster
 #This template creates a cluster with custom amis.
@@ -172,7 +184,7 @@ Resources:
                 MaxSize: !Ref MaxSize
                 MinSize: !Ref MinSize
                 VPC: !GetAtt VPC.Outputs.VPC
-                SecurityGroup: !Ref STACSG
+                SecurityGroup: !Ref STACKSG_ECS
                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
                 KeyPair: !Ref KeyPair
                 Desired: !Ref DesiredSize
@@ -190,7 +202,7 @@ Resources:
                 EnvironmentName: !Sub ${AWS::StackName}-client
                 VPC: !GetAtt VPC.Outputs.VPC
                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-                VPCSecurityGroups: !Ref STACSG
+                VPCSecurityGroups: !Ref STACKSG_ECS
                 Engine: !Ref DBEngine
                 DBName: !Ref DBName
                 DBInstanceIdentifier: !Ref DBInstanceIdentifier
@@ -212,7 +224,7 @@ Resources:
                 Engine: !Ref CacheEngine
                 NumCacheNodes: !Ref CacheNumCacheNodes
                 VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-                VPCSecurityGroupsIds: !Ref STACSG
+                VPCSecurityGroupsIds: !Ref STACKSG_ECS
 
 #Client service
 #this template is for a standar client service.
