@@ -93,12 +93,12 @@ Resources:
                   PropagateAtLaunch: true
         CreationPolicy:
             ResourceSignal:
-                Timeout: PT15M
+                Timeout: PT1M
         UpdatePolicy:
             AutoScalingRollingUpdate:
                 MinInstancesInService: 1
                 MaxBatchSize: 1
-                PauseTime: PT15M
+                PauseTime: PT1M
                 WaitOnResourceSignals: true
 
     ScaleUpPolicy:
@@ -201,16 +201,92 @@ Resources:
             Threshold: '40'
             ComparisonOperator: LessThanThreshold
 
-
     ECSLaunchConfiguration:
         Type: AWS::AutoScaling::LaunchConfiguration
         Properties:
-            ImageId:  !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
-            InstanceType: !Ref InstanceType
-            KeyName: !Ref KeyPair
-            SecurityGroups:
-                - !Ref SecurityGroup
-            IamInstanceProfile: !Ref ECSInstanceProfile
+          ImageId: !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
+          InstanceType: !Ref InstanceType
+          KeyName: !Ref KeyPair
+          AssociatePublicIpAddress: true
+          SecurityGroups:
+            - !Ref SecurityGroup
+          IamInstanceProfile: !Ref ECSInstanceProfile
+          BlockDeviceMappings:
+            - DeviceName: "/dev/xvdcy"
+              Ebs:
+                VolumeSize: "50"
+                VolumeType: "gp2"
+          UserData:
+            Fn::Base64: !Sub |
+                  #!/bin/bash
+                  yum install -y python-pip
+                  pip-2.6 install awscli
+                  yum install -y aws-cfn-bootstrap
+                  yum install -y git
+                  vgextend docker /dev/xvdcy
+                  lvextend -L+100G /dev/docker/docker-pool
+                  /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+                  /opt/aws/bin/cfn-signal -e 0 --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
+        Metadata:
+          AWS::CloudFormation::Init:
+            config:
+              files:
+                "/etc/cfn/cfn-hup.conf":
+                  mode: 000400
+                  owner: rootion:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            ContainerDefinitions:
+              - Name: simple-app
+                Cpu: '10'
+                Essential: 'true'
+                Image: httpd:2.4
+                Memory: '300'
+                LogConfiguration:
+                  LogDriver: awslogs
+                  Options:
+                    awslogs-group: !Ref 'CloudwatchLogsGroup'
+                    awslogs-region: !Ref 'AWS::Region'
+                    awslogs-stream-prefix: ecs-demo-app
+                MountPoints:
+                - ContainerPath: /usr/local/apache2/htdocs
+                  SourceVolume: my-vol
+                PortMappings:
+                - ContainerPort: 80
+              - Name: busybox
+                Cpu: 10
+                Command: ['/bin/sh -c "while true; do echo ''<html> <head> <title>Amazon ECS EC2
+                    Sample App</title> <style>body {margin-top: 40px; background-color: #333;}
+                    </style> </head><body> <div style=color:white;text-align:center> <h1>Amazon
+                    ECS EC2 Sample App</h1> <h2>Congratulations!</h2> <p>Your application is now
+                    running on a container in Amazon ECS.</p>'' > top; /bin/date > date ;
+                    echo ''</div></body></html>'' > bottom; cat top date bottom > /usr/local/apache2/htdocs/index.html
+                    ; sleep 1; done"']
+                  group: root
+                  content: !Sub |
+                    [main]
+                    stack=${AWS::StackId}
+                    region=${AWS::Region}
+                "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+                  mode: 000400
+                  owner: root
+                  group: root
+                  content: !Sub |
+                    [cfn-auto-reloader-hook]
+                    triggers=post.update
+                    path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
+                    action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+              commands:
+                01_add_instance_to_cluster:
+                  command: !Sub echo ECS_CLUSTER=${EnvironmentName} >> /etc/ecs/ecs.config
+              services:
+                sysvinit:
+                  cfn-hup:
+                    enabled: true
+                    ensureRunning: true
+                    files:
+                      - /etc/cfn/cfn-hup.conf
+                      - /etc/cfn/hooks.d/cfn-auto-reloader.conf
 
     # This IAM Role is attached to all of the ECS hosts. It is based on the default role
     # published here:

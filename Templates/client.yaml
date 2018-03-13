@@ -34,6 +34,9 @@ Parameters:
     DBURL:
         Type: String
 
+    DBPort:
+        Type: String
+
     RedisHost:
         Type: String
 
