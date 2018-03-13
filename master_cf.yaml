@@ -2,155 +2,154 @@ Description: >
     ECS templates generalized.
 
 Parameters:
+    CertificateARN:
+        Description: Certificate of SSL for HTTPS
+        Type: String
 
-  CertificateARN:
-    Description: Certificate of SSL for HTTPS
-    Type: String
+    StackEnv:
+        Description: The enviroment that we are going to work on
+        Default: qa
+        Type: String
+        AllowedValues:
+            - qa
+            - prod
 
-  StackEnv:
-    Description: The enviroment that we are going to work on
-    Default: qa
-    Type: String
-    AllowedValues:
-      - qa
-      - prod
-
-  ImageTag:
-    Description: The tag that will be looked for
-    Default: prod
-    Type: String
+    ImageTag:
+        Description: The tag that will be looked for
+        Default: prod
+        Type: String
 
 #cluster configuration
-  InstanceType:
-      Description: Which instance type should we use to build the ECS cluster?
-      Default: t2.micro
-      Type: String
+    InstanceType:
+        Description: Which instance type should we use to build the ECS cluster?
+        Default: t2.micro
+        Type: String
 
-  DesiredSize:
-      Description: Desired dumber of EC2 Instances in the ASG cannot be less than MinSize
-      Default: 2
-      Type: Number
+    DesiredSize:
+        Description: Desired dumber of EC2 Instances in the ASG cannot be less than MinSize
+        Default: 2
+        Type: Number
 
-  MinSize:
-    Description: Minimum number of ECS Instances in the ASG
-    Default: 1
-    Type: Number
+    MinSize:
+        Description: Minimum number of ECS Instances in the ASG
+        Default: 1
+        Type: Number
 
-  MaxSize:
-      Description: Maximum number of EC2 Instances in the ASG
-      Default: 3
-      Type: Number
+    MaxSize:
+        Description: Maximum number of EC2 Instances in the ASG
+        Default: 3
+        Type: Number
 
-  KeyPair:
-      Description: Amazon EC2 Key Pair
-      Default: KeyFerdinand
-      Type: "AWS::EC2::KeyPair::KeyName"
+    KeyPair:
+        Description: Amazon EC2 Key Pair
+        Default: KeyFerdinand
+        Type: "AWS::EC2::KeyPair::KeyName"
 
 #database parameters if you need one
-  DBMasterUsername:
-    Description: The database user name for the db instance
-    Default: demo
-    Type: String
+    DBMasterUsername:
+        Description: The database user name for the db instance
+        Default: demo
+        Type: String
 
-  DBMasterUserPassword:
-    Description: The password for the master user for the database
-    Default: ferdinand_demo
-    Type: String
-    NoEcho: true
+    DBMasterUserPassword:
+        Description: The password for the master user for the database
+        Default: ferdinand_demo
+        Type: String
+        NoEcho: true
 
-  DBInstanceClass:
-    Description: Name of the compute and capacity clasess of the database
-    Default: db.t2.micro
-    Type: String
+    DBInstanceClass:
+        Description: Name of the compute and capacity clasess of the database
+        Default: db.t2.micro
+        Type: String
 
-  DBEngine:
-    Description: Database engine that the DB instance use.
-    Default: MySQL
-    Type: String
+    DBEngine:
+        Description: Database engine that the DB instance use.
+        Default: MySQL
+        Type: String
 
-  DBName:
-    Description: Name of the database provided at the time of creation
-    Default: demoDB
-    Type: String
+    DBName:
+        Description: Name of the database provided at the time of creation
+        Default: demoDB
+        Type: String
 
-  DBInstanceIdentifier:
-    Description: Name of the database
-    Default: demoDB
-    Type: String
+    DBInstanceIdentifier:
+        Description: Name of the database
+        Default: demoDB
+        Type: String
 
-  DBAllocatedStorage:
-    Description: Allocated storage size fot the db (GB)
-    Default: 100
-    Type: Number
+    DBAllocatedStorage:
+        Description: Allocated storage size fot the db (GB)
+        Default: 100
+        Type: Number
 
 #cache database if you need on
-  CacheNodeType:
-    Description: The compute and memory capacity of nodes in a cache cluster.
-    Default: cache.t2.micro
-    Type: String
+    CacheNodeType:
+        Description: The compute and memory capacity of nodes in a cache cluster.
+        Default: cache.t2.micro
+        Type: String
 
-  CacheEngine:
-    Description: Engine of the cache
-    Default: redis
-    Type: String
+    CacheEngine:
+        Description: Engine of the cache
+        Default: redis
+        Type: String
 
-  CacheClusterName:
-    Description: Name of the cache cluster.
-    Default: redisCache
-    Type: String
+    CacheClusterName:
+        Description: Name of the cache cluster.
+        Default: redisCache
+        Type: String
 
-  CacheNumCacheNodes:
-    Description: Number of nodes in the cache cluster.
-    Default: 1
-    Type: Number
+    CacheNumCacheNodes:
+        Description: Number of nodes in the cache cluster.
+        Default: 1
+        Type: Number
 
 Resources:
 
-  VPC:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/vpc.yaml
-      Parameters:
-        EnvironmentName:    !Ref AWS::StackName
-        VpcCIDR:            10.24.0.0/16
-        PublicSubnet1CIDR:  10.24.8.0/21
-        PublicSubnet2CIDR:  10.24.16.0/21
-        PrivateSubnet1CIDR: 10.24.24.0/21
-        PrivateSubnet2CIDR: 10.24.32.0/21
+    VPC:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/vpc.yaml
+            Parameters:
+                EnvironmentName:    !Ref AWS::StackName
+                VpcCIDR:            10.24.0.0/16
+                PublicSubnet1CIDR:  10.24.8.0/21
+                PublicSubnet2CIDR:  10.24.16.0/21
+                PrivateSubnet1CIDR: 10.24.24.0/21
+                PrivateSubnet2CIDR: 10.24.32.0/21
 
 #Secutiry Group
 #Services that allow us to enable trafic through ports/protocols
-  STACSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      VpcId: !GetAtt VPC.Outputs.VPC
-      GroupDescription: KEN SG for production enviroment
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: '443'
-          ToPort: '443'
-          CidrIp: "0.0.0.0/0"
-        - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: "0.0.0.0/0"
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-Client
+    STACSG:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            VpcId: !GetAtt VPC.Outputs.VPC
+            GroupDescription: KEN SG for production enviroment
+            SecurityGroupIngress:
+                -   IpProtocol: tcp
+                    FromPort: '443'
+                    ToPort: '443'
+                    CidrIp: "0.0.0.0/0"
+                -   IpProtocol: tcp
+                    FromPort: '80'
+                    ToPort: '80'
+                    CidrIp: "0.0.0.0/0"
+            Tags:
+                -   Key: Name
+                    Value: !Sub ${AWS::StackName}-Client
 
 #Elastic Load Balancer
 #This template enable trafic listeners on ports 80 and 443
 #Set a default target group for all listener, but you have to define the target group for each service (see client service)
-  STACKELB:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/elb.yaml
-      Parameters:
-        EnvironmentName: !Sub ${AWS::StackName}-Client
-        VPC: !GetAtt VPC.Outputs.VPC
-        Subnets: !GetAtt VPC.Outputs.PublicSubnets
-        CertificateArn: !Ref CertificateARN
-        SecurityGroup: !Ref STACSG
+    STACKELB:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/elb.yaml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                VPC: !GetAtt VPC.Outputs.VPC
+                Subnets: !GetAtt VPC.Outputs.PublicSubnets
+                CertificateArn: !Ref CertificateARN
+                SecurityGroup: !Ref STACSG
 
 #Cluster
 #This template creates a cluster with custom amis.
@@ -163,84 +162,87 @@ Resources:
   #EC2 ROLE ECS ALLOW *
   #Mappings amis, identifier is region specific.
   #LaunchConfiguration is set to the mappings amis
-  STACKECS:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/ecs.yaml
-      Parameters:
-        EnvironmentName: !Sub ${AWS::StackName}-client
-        InstanceType: !Ref InstanceType
-        MaxSize: !Ref MaxSize
-        MinSize: !Ref MinSize
-        VPC: !GetAtt VPC.Outputs.VPC
-        SecurityGroup: !Ref STACSG
-        Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-        KeyPair: !Ref KeyPair
-        Desired: !Ref DesiredSize
-        ScaleUpTreshold: 80
-        ScaleDownTreshold: 40
+    STACKECS:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/ecs.yaml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                InstanceType: !Ref InstanceType
+                MaxSize: !Ref MaxSize
+                MinSize: !Ref MinSize
+                VPC: !GetAtt VPC.Outputs.VPC
+                SecurityGroup: !Ref STACSG
+                Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+                KeyPair: !Ref KeyPair
+                Desired: !Ref DesiredSize
+                ScaleUpTreshold: 80
+                ScaleDownTreshold: 40
 
 #Database
 #this template is for a standar rds service.
 #You can provide a new instance for the deployment if needed.
-  # STACKDB:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #       TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/rds.yml
-  #       Parameters:
-  #         EnvironmentName: !Sub ${AWS::StackName}-client
-  #         VPC: !GetAtt VPC.Outputs.VPC
-  #         Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-  #         VPCSecurityGroups: !Ref STACSG
-  #         Engine: !Ref DBEngine
-  #         DBName: !Ref DBName
-  #         DBInstanceIdentifier: !Ref DBInstanceIdentifier
-  #         MasterUsername: !Ref DBMasterUsername
-  #         MasterUserPassword: !Ref DBMasterUserPassword
-  #         DBInstanceClass: !Ref DBInstanceClass
-  #         AllocatedStorage: !Ref DBAllocatedStorage
+    # STACKDB:
+    #     Type: AWS::CloudFormation::Stack
+    #     Properties:
+    #         TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/rds.yml
+    #         Parameters:
+    #             EnvironmentName: !Sub ${AWS::StackName}-client
+    #             VPC: !GetAtt VPC.Outputs.VPC
+    #             Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+    #             VPCSecurityGroups: !Ref STACSG
+    #             Engine: !Ref DBEngine
+    #             DBName: !Ref DBName
+    #             DBInstanceIdentifier: !Ref DBInstanceIdentifier
+    #             MasterUsername: !Ref DBMasterUsername
+    #             MasterUserPassword: !Ref DBMasterUserPassword
+    #             DBInstanceClass: !Ref DBInstanceClass
+    #             AllocatedStorage: !Ref DBAllocatedStorage
 
 #Cache
 #This template is for a cache instance of redis
-  # STACKCACHE:
-  #  Type: AWS::CloudFormation::Stack
-  #  Properties:
-  #      TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/cache_db.yaml
-  #      Parameters:
-  #        EnvironmentName: !Sub ${AWS::StackName}-client
-  #        CacheNodeType: !Ref CacheNodeType
-  #        ClusterName: !Ref CacheClusterName
-  #        Engine: !Ref CacheEngine
-  #        NumCacheNodes: !Ref CacheNumCacheNodes
-  #        VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-  #        VPCSecurityGroupsIds: !Ref STACSG
+    # STACKCACHE:
+    #     Type: AWS::CloudFormation::Stack
+    #     Properties:
+    #         TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/cache_db.yaml
+    #         Parameters:
+    #             EnvironmentName: !Sub ${AWS::StackName}-client
+    #             CacheNodeType: !Ref CacheNodeType
+    #             ClusterName: !Ref CacheClusterName
+    #             Engine: !Ref CacheEngine
+    #             NumCacheNodes: !Ref CacheNumCacheNodes
+    #             VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
+    #             VPCSecurityGroupsIds: !Ref STACSG
 
 #Client service
 #this template is for a standar client service.
 #Importan parameters:
   #DesiredCount - this parameter will have a default of 2 instances
   #ImageTag - Image tag would search for an ami version with this tag
-  ClientService:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-        TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/client.yaml
-        Parameters:
-          VPC: !GetAtt VPC.Outputs.VPC
-          Cluster: !Ref STACKECS
-          DesiredCount: 2
-          HttpListener: !GetAtt STACKELB.Outputs.HttpListener
-          #HttpsListener: !GetAtt STACKELB.Outputs.HttpsListener
-          DBName: !Ref DBName
-          DBUser: !Ref DBMasterUsername
-          #DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
-          #DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
-          #RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
-          #RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
-          ImageTag: !Ref ImageTag
-          STACKENV: !Ref StackEnv
+    ClientService:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/client.yaml
+            Parameters:
+                VPC: !GetAtt VPC.Outputs.VPC
+                Cluster: !Ref STACKECS
+                DesiredCount: 2
+                HttpListener: !GetAtt STACKELB.Outputs.HttpListener
+                HttpsListener: !GetAtt STACKELB.Outputs.HttpListener
+                DBName: !Ref DBName
+                DBUser: !Ref DBMasterUsername
+                # DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
+                # DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
+                # RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
+                # RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
+                DBURL: dumy
+                DBPort: dumy
+                RedisHost: dumy
+                RedisPort: dumy
+                ImageTag: !Ref ImageTag
+                STACKENV: !Ref StackEnv
 
 Outputs:
-
-  URL:
-    Description: URL of demo
-    Value: !Ref STACKELB
+    URL:
+        Description: URL of demo
+        Value: !Ref STACKELB

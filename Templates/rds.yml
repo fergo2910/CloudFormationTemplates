@@ -2,76 +2,75 @@ Description: >
     DB templates
 
 Parameters:
-  EnvironmentName:
-    Description: An environment name that will be prefixed to resource names
-    Type: String
+    EnvironmentName:
+        Description: An environment name that will be prefixed to resource names
+        Type: String
 
-  VPC:
-    Description: Choose which VPC this ECS cluster should be deployed to
-    Type: AWS::EC2::VPC::Id
+    VPC:
+        Description: Choose which VPC this ECS cluster should be deployed to
+        Type: AWS::EC2::VPC::Id
 
-  Subnets:
-    Description: Choose which subnets this cluster should be deployed to
-    Type: List<AWS::EC2::Subnet::Id>
+    Subnets:
+        Description: Choose which subnets this cluster should be deployed to
+        Type: List<AWS::EC2::Subnet::Id>
 
-  VPCSecurityGroups:
-    Type: List<AWS::EC2::SecurityGroup::Id>
+    VPCSecurityGroups:
+        Type: List<AWS::EC2::SecurityGroup::Id>
 
-  Engine:
-    Type: String
+    Engine:
+        Type: String
 
-  DBName:
-    Type: String
+    DBName:
+        Type: String
 
-  DBInstanceIdentifier:
-    Type: String
+    DBInstanceIdentifier:
+        Type: String
 
-  MasterUsername:
-    Type: String
+    MasterUsername:
+        Type: String
 
-  MasterUserPassword:
-    Type: String
+    MasterUserPassword:
+        Type: String
 
-  DBInstanceClass:
-    Type: String
+    DBInstanceClass:
+        Type: String
 
-  AllocatedStorage:
-    Type: Number
+    AllocatedStorage:
+        Type: Number
 
 Resources:
-  DBSubnetGroup:
-    Type: "AWS::RDS::DBSubnetGroup"
-    Properties:
-      DBSubnetGroupDescription: "RDS Subnet Group"
-      SubnetIds: !Ref Subnets
+    DBSubnetGroup:
+        Type: "AWS::RDS::DBSubnetGroup"
+        Properties:
+            DBSubnetGroupDescription: "RDS Subnet Group"
+            SubnetIds: !Ref Subnets
 
-  DBInstance:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      DBName: !Ref DBName
-      DBInstanceIdentifier: !Ref DBInstanceIdentifier
-      Engine: !Ref Engine
-      MasterUsername: !Ref MasterUsername
-      DBInstanceClass: !Ref DBInstanceClass
-      AllocatedStorage: !Ref AllocatedStorage
-      MasterUserPassword: !Ref MasterUserPassword
-      VPCSecurityGroups: !Ref VPCSecurityGroups
-      DBSubnetGroupName:
-        Ref: "DBSubnetGroup"
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-ElastiCacheCluster
+    DBInstance:
+        Type: AWS::RDS::DBInstance
+        Properties:
+            DBName: !Ref DBName
+            DBInstanceIdentifier: !Ref DBInstanceIdentifier
+            Engine: !Ref Engine
+            MasterUsername: !Ref MasterUsername
+            DBInstanceClass: !Ref DBInstanceClass
+            AllocatedStorage: !Ref AllocatedStorage
+            MasterUserPassword: !Ref MasterUserPassword
+            VPCSecurityGroups: !Ref VPCSecurityGroups
+            DBSubnetGroupName:
+                Ref: "DBSubnetGroup"
+            Tags:
+                - Key: Name
+                  Value: !Sub ${EnvironmentName}-ECC
 
 Outputs:
-
     DBInstance:
         Description: A reference to the created DBInstance
         Value: !Ref DBInstance
 
     DBEndpointAddress:
-      Description: Endpoint for the instance
-      Value: !GetAtt DBInstance.Endpoint.Address
+        Description: Endpoint for the instance
+        Value: !GetAtt DBInstance.Endpoint.Address
 
     DBEndpointPort:
-      Description: Port for the instance
-      Value: !GetAtt DBInstance.Endpoint.Port
+        Description: Port for the instance
+        Value: !GetAtt DBInstance.Endpoint.Port

@@ -64,57 +64,55 @@ Resources:
             Role: !Ref ServiceRole
             DesiredCount: !Ref DesiredCount
             TaskDefinition: !Ref TaskDefinition
-            DeploymentConfiguration:
-                MaximumPercent: 200
-                MinimumHealthyPercent: 100
             LoadBalancers:
-                - ContainerName: "client"
-                  ContainerPort: 80
+                - ContainerName: simple-app
+                  ContainerPort: '80'
                   TargetGroupArn: !Ref TargetGroup
 
     TaskDefinition:
         Type: AWS::ECS::TaskDefinition
         Properties:
+            Family: !Join ['', [!Ref 'AWS::StackName', -ecs-demo-app]]
             ContainerDefinitions:
-              - Name: simple-app
-                Cpu: '10'
-                Essential: 'true'
-                Image: httpd:2.4
-                Memory: '300'
-                LogConfiguration:
-                  LogDriver: awslogs
-                  Options:
-                    awslogs-group: !Ref 'CloudwatchLogsGroup'
-                    awslogs-region: !Ref 'AWS::Region'
-                    awslogs-stream-prefix: ecs-demo-app
-                MountPoints:
-                - ContainerPath: /usr/local/apache2/htdocs
-                  SourceVolume: my-vol
-                PortMappings:
-                - ContainerPort: 80
-              - Name: busybox
-                Cpu: 10
-                Command: ['/bin/sh -c "while true; do echo ''<html> <head> <title>Amazon ECS EC2
+                -   Name: simple-app
+                    Cpu: '10'
+                    Essential: 'true'
+                    Image: httpd:2.4
+                    Memory: '300'
+                    LogConfiguration:
+                        LogDriver: awslogs
+                        Options:
+                            awslogs-group: !Ref 'CloudwatchLogsGroup'
+                            awslogs-region: !Ref 'AWS::Region'
+                            awslogs-stream-prefix: ecs-demo-app
+                    MountPoints:
+                        -   ContainerPath: /usr/local/apache2/htdocs
+                            SourceVolume: my-vol
+                    PortMappings:
+                        -   ContainerPort: 80
+                -   Name: busybox
+                    Cpu: 10
+                    Command: ['/bin/sh -c "while true; do echo ''<html> <head> <title>Amazon ECS EC2
                     Sample App</title> <style>body {margin-top: 40px; background-color: #333;}
                     </style> </head><body> <div style=color:white;text-align:center> <h1>Amazon
                     ECS EC2 Sample App</h1> <h2>Congratulations!</h2> <p>Your application is now
                     running on a container in Amazon ECS.</p>'' > top; /bin/date > date ;
                     echo ''</div></body></html>'' > bottom; cat top date bottom > /usr/local/apache2/htdocs/index.html
                     ; sleep 1; done"']
-                EntryPoint: [sh, -c]
-                Essential: false
-                Image: busybox
-                Memory: 200
-                LogConfiguration:
-                  LogDriver: awslogs
-                  Options:
-                    awslogs-group: !Ref 'CloudwatchLogsGroup'
-                    awslogs-region: !Ref 'AWS::Region'
-                    awslogs-stream-prefix: ecs-demo-app
-                VolumesFrom:
-                - SourceContainer: simple-app
-                Volumes:
-                  - Name: my-vol
+                    EntryPoint: [sh, -c]
+                    Essential: false
+                    Image: busybox
+                    Memory: 200
+                    LogConfiguration:
+                        LogDriver: awslogs
+                        Options:
+                            awslogs-group: !Ref 'CloudwatchLogsGroup'
+                            awslogs-region: !Ref 'AWS::Region'
+                            awslogs-stream-prefix: ecs-demo-app
+                    VolumesFrom:
+                        -   SourceContainer: simple-app
+            Volumes:
+                -   Name: my-vol
 
     CloudwatchLogsGroup:
         Type: AWS::Logs::LogGroup
@@ -156,12 +154,12 @@ Resources:
             ListenerArn: !Ref HttpListener
             Priority: 3
             Conditions:
-                - Field: path-pattern
-                  Values:
-                    - !Ref Path
+                -   Field: path-pattern
+                    Values:
+                    -   !Ref Path
             Actions:
-                - TargetGroupArn: !Ref TargetGroup
-                  Type: forward
+                -   TargetGroupArn: !Ref TargetGroup
+                    Type: forward
 
     # This IAM Role grants the service access to register/unregister with the
     # Application Load Balancer (ALB). It is based on the default documented here:
