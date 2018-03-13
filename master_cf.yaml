@@ -182,37 +182,37 @@ Resources:
 #Database
 #this template is for a standar rds service.
 #You can provide a new instance for the deployment if needed.
-    # STACKDB:
-    #     Type: AWS::CloudFormation::Stack
-    #     Properties:
-    #         TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/rds.yml
-    #         Parameters:
-    #             EnvironmentName: !Sub ${AWS::StackName}-client
-    #             VPC: !GetAtt VPC.Outputs.VPC
-    #             Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-    #             VPCSecurityGroups: !Ref STACSG
-    #             Engine: !Ref DBEngine
-    #             DBName: !Ref DBName
-    #             DBInstanceIdentifier: !Ref DBInstanceIdentifier
-    #             MasterUsername: !Ref DBMasterUsername
-    #             MasterUserPassword: !Ref DBMasterUserPassword
-    #             DBInstanceClass: !Ref DBInstanceClass
-    #             AllocatedStorage: !Ref DBAllocatedStorage
+    STACKDB:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/rds.yml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                VPC: !GetAtt VPC.Outputs.VPC
+                Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+                VPCSecurityGroups: !Ref STACSG
+                Engine: !Ref DBEngine
+                DBName: !Ref DBName
+                DBInstanceIdentifier: !Ref DBInstanceIdentifier
+                MasterUsername: !Ref DBMasterUsername
+                MasterUserPassword: !Ref DBMasterUserPassword
+                DBInstanceClass: !Ref DBInstanceClass
+                AllocatedStorage: !Ref DBAllocatedStorage
 
 #Cache
 #This template is for a cache instance of redis
-    # STACKCACHE:
-    #     Type: AWS::CloudFormation::Stack
-    #     Properties:
-    #         TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/cache_db.yaml
-    #         Parameters:
-    #             EnvironmentName: !Sub ${AWS::StackName}-client
-    #             CacheNodeType: !Ref CacheNodeType
-    #             ClusterName: !Ref CacheClusterName
-    #             Engine: !Ref CacheEngine
-    #             NumCacheNodes: !Ref CacheNumCacheNodes
-    #             VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-    #             VPCSecurityGroupsIds: !Ref STACSG
+    STACKCACHE:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/cache_db.yaml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                CacheNodeType: !Ref CacheNodeType
+                ClusterName: !Ref CacheClusterName
+                Engine: !Ref CacheEngine
+                NumCacheNodes: !Ref CacheNumCacheNodes
+                VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
+                VPCSecurityGroupsIds: !Ref STACSG
 
 #Client service
 #this template is for a standar client service.
@@ -225,24 +225,24 @@ Resources:
             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/client.yaml
             Parameters:
                 VPC: !GetAtt VPC.Outputs.VPC
-                Cluster: !Ref STACKECS
-                DesiredCount: 2
+                Cluster: !GetAtt STACKECS.Outputs.Cluster
+                DesiredCount: 1
                 HttpListener: !GetAtt STACKELB.Outputs.HttpListener
                 HttpsListener: !GetAtt STACKELB.Outputs.HttpListener
                 DBName: !Ref DBName
                 DBUser: !Ref DBMasterUsername
-                # DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
-                # DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
-                # RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
-                # RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
-                DBURL: dumy
-                DBPort: dumy
-                RedisHost: dumy
-                RedisPort: dumy
+                DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
+                DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
+                RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
+                RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
+                # DBURL: dumy
+                # DBPort: dumy
+                # RedisHost: dumy
+                # RedisPort: dumy
                 ImageTag: !Ref ImageTag
                 STACKENV: !Ref StackEnv
 
 Outputs:
     URL:
         Description: URL of demo
-        Value: !Ref STACKELB
+        Value: !GetAtt STACKELB.Outputs.LoadBalancerUrl

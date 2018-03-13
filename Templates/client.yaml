@@ -15,7 +15,7 @@ Parameters:
     DesiredCount:
         Description: How many instances of this task should we run across our cluster?
         Type: Number
-        Default: 2
+        Default: 1
 
     HttpListener:
         Description: The Application Load Balancer listener to register with
@@ -65,9 +65,9 @@ Resources:
             DesiredCount: !Ref DesiredCount
             TaskDefinition: !Ref TaskDefinition
             LoadBalancers:
-                - ContainerName: simple-app
-                  ContainerPort: '80'
-                  TargetGroupArn: !Ref TargetGroup
+            -   ContainerName: simple-app
+                ContainerPort: '80'
+                TargetGroupArn: !Ref TargetGroup
 
     TaskDefinition:
         Type: AWS::ECS::TaskDefinition
