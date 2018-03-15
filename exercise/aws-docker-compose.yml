@@ -1,0 +1,74 @@
+version: '3'
+
+volumes:
+   data-volume-1:
+     external: true
+
+services:
+  consul:
+    image: consul
+    ports:
+      - "8300:8300"
+      - "8400:8400"
+      - "8500:8500"
+    networks:
+      - front-tier
+
+  redis:
+    image: redis
+    command: redis-server --appendonly yes
+    volumes:
+      - data-volume-1:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - back-tier
+
+  node_api:
+    image: node
+    command: node /usr/src/code_node_api/server.js
+    volumes:
+      - .:/usr/src
+    ports:
+      - "7000:7000"
+    networks:
+      - front-tier
+      - back-tier
+
+  web_app_01:
+    build: .
+    command: python3 manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/code_web_app
+    ports:
+      - "8000:8000"
+    networks:
+      - front-tier
+
+  web_app_02:
+    build: .
+    command: python3 manage.py runserver 0.0.0.0:9000
+    volumes:
+      - .:/code_web_app
+    ports:
+      - "9000:9000"
+    networks:
+      - front-tier
+
+  lb:
+    image: dockercloud/haproxy
+    ports:
+      - 80:80
+    links:
+      - web_app_01
+      - web_app_02
+    networks:
+      - front-tier
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
+
+networks:
+  front-tier:
+    driver: bridge
+  back-tier:
+    driver: bridge

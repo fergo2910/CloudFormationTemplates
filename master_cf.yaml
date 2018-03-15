@@ -26,12 +26,12 @@ Parameters:
         Type: String
 
     DesiredSize:
-        Description: Desired dumber of EC2 Instances in the ASG cannot be less than MinSize
-        Default: 2
+        Description: Desired number of EC2 Instances in the ASG cannot be less than MinSize
+        Default: 1
         Type: Number
 
     MinSize:
-        Description: Minimum number of ECS Instances in the ASG
+        Description: Minimum number of EC2 Instances in the ASG
         Default: 1
         Type: Number
 
@@ -237,10 +237,11 @@ Resources:
             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/client.yaml
             Parameters:
                 VPC: !GetAtt VPC.Outputs.VPC
+                LoadBalancer: !GetAtt STACKELB.Outputs.LoadBalancer
                 Cluster: !GetAtt STACKECS.Outputs.Cluster
                 DesiredCount: 1
                 HttpListener: !GetAtt STACKELB.Outputs.HttpListener
-                HttpsListener: !GetAtt STACKELB.Outputs.HttpListener
+                HttpsListener: dumy
                 DBName: !Ref DBName
                 DBUser: !Ref DBMasterUsername
                 DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress

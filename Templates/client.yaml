@@ -8,6 +8,10 @@ Parameters:
         Description: The VPC that the ECS cluster is deployed to
         Type: AWS::EC2::VPC::Id
 
+    LoadBalancer:
+        Description: The Load balancer for Auto Scaling Service
+        Type: String
+
     Cluster:
         Description: Please provide the ECS Cluster ID that this service should run on
         Type: String
@@ -57,6 +61,47 @@ Parameters:
 
 Resources:
 
+    ServiceScalingTarget:
+        Type: AWS::ApplicationAutoScaling::ScalableTarget
+        DependsOn: Service
+        Properties:
+            MaxCapacity: 3
+            MinCapacity: 1
+            ResourceId: !Join ['', [service/, !Ref Cluster, /, !GetAtt [Service, Name]]]
+            RoleARN: !GetAtt [AutoscalingRole, Arn]
+            ScalableDimension: ecs:service:DesiredCount
+            ServiceNamespace: ecs
+
+    ServiceScalingPolicy:
+        Type: AWS::ApplicationAutoScaling::ScalingPolicy
+        Properties:
+            PolicyName: AStepPolicy
+            PolicyType: StepScaling
+            ScalingTargetId: !Ref ServiceScalingTarget
+            StepScalingPolicyConfiguration:
+                AdjustmentType: PercentChangeInCapacity
+                Cooldown: 60
+                MetricAggregationType: Average
+                StepAdjustments:
+                    -   MetricIntervalLowerBound: 0
+                        ScalingAdjustment: 200
+
+    HTTP500ScaleUpAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            EvaluationPeriods: '1'
+            Statistic: Average
+            Threshold: '10'
+            AlarmDescription: Alarm if our ELB generates too many HTTP 500s.
+            Period: '60'
+            AlarmActions: [!Ref 'ServiceScalingPolicy']
+            Namespace: AWS/CLIENT
+            ComparisonOperator: GreaterThanThreshold
+            MetricName: HTTPCode_ELB_5XX_Count
+            Dimensions:
+                -   Name: LoadBalancerName
+                    Value: !Ref LoadBalancer
+
     Service:
         Type: AWS::ECS::Service
         Properties:
@@ -90,6 +135,19 @@ Resources:
                             SourceVolume: my-vol
                     PortMappings:
                         -   ContainerPort: 80
+                    Environment:
+                        -   Name: DBName
+                            Value: !Ref DBName
+                        -   Name: DBUser
+                            Value: !Ref DBUser
+                        -   Name: DBURL
+                            Value: !Ref DBURL
+                        -   Name: DBPort
+                            Value: !Ref DBPort
+                        -   Name: RedisHost
+                            Value: !Ref RedisHost
+                        -   Name: RedisPort
+                            Value: !Ref RedisPort
                 -   Name: busybox
                     Cpu: 10
                     Command: ['/bin/sh -c "while true; do echo ''<html> <head> <title>Amazon ECS EC2
@@ -198,3 +256,22 @@ Resources:
                                 "Resource": "*"
                         }]
                     }
+
+    AutoscalingRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    -   Effect: Allow
+                        Principal:
+                            Service: [application-autoscaling.amazonaws.com]
+                        Action: ['sts:AssumeRole']
+            Path: /
+            Policies:
+                -   PolicyName: service-autoscaling
+                    PolicyDocument:
+                        Statement:
+                            -   Effect: Allow
+                                Action: ['application-autoscaling:*', 'cloudwatch:DescribeAlarms', 'cloudwatch:PutMetricAlarm',
+                                'ecs:DescribeServices', 'ecs:UpdateService']
+                                Resource: '*'
