@@ -105,7 +105,7 @@ Resources:
         Properties:
             AdjustmentType: ChangeInCapacity
             AutoScalingGroupName: !Ref ECSAutoScalingGroup
-            EstimatedInstanceWarmup: 300
+            EstimatedInstanceWarmup: 120
             MetricAggregationType: Average
             PolicyType: StepScaling
             StepAdjustments:
@@ -120,7 +120,7 @@ Resources:
         Properties:
             AdjustmentType: ChangeInCapacity
             AutoScalingGroupName: !Ref ECSAutoScalingGroup
-            EstimatedInstanceWarmup: 300
+            EstimatedInstanceWarmup: 120
             MetricAggregationType: Average
             PolicyType: StepScaling
             StepAdjustments:

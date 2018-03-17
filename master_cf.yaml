@@ -16,7 +16,7 @@ Parameters:
 
     ImageTag:
         Description: The tag that will be looked for
-        Default: prod
+        Default: test
         Type: String
 
 #cluster configuration

@@ -66,7 +66,7 @@ Resources:
         DependsOn: Service
         Properties:
             MaxCapacity: 3
-            MinCapacity: 1
+            MinCapacity: 0
             ResourceId: !Join ['', [service/, !Ref Cluster, /, !GetAtt [Service, Name]]]
             RoleARN: !GetAtt [AutoscalingRole, Arn]
             ScalableDimension: ecs:service:DesiredCount
@@ -120,9 +120,13 @@ Resources:
             Family: !Join ['', [!Ref 'AWS::StackName', -ecs-demo-app]]
             ContainerDefinitions:
                 -   Name: simple-app
+                    Command:
+                        -   "/bin/bash"
+                        -   "-c"
+                        -   "python3 manage.py runserver 0.0.0.0:80"
                     Cpu: '10'
                     Essential: 'true'
-                    Image: httpd:2.4
+                    Image: !Sub 202279780353.dkr.ecr.us-east-1.amazonaws.com/general_image:${ImageTag}
                     Memory: '300'
                     LogConfiguration:
                         LogDriver: awslogs
@@ -130,9 +134,6 @@ Resources:
                             awslogs-group: !Ref 'CloudwatchLogsGroup'
                             awslogs-region: !Ref 'AWS::Region'
                             awslogs-stream-prefix: ecs-demo-app
-                    MountPoints:
-                        -   ContainerPath: /usr/local/apache2/htdocs
-                            SourceVolume: my-vol
                     PortMappings:
                         -   ContainerPort: 80
                     Environment:
@@ -148,29 +149,6 @@ Resources:
                             Value: !Ref RedisHost
                         -   Name: RedisPort
                             Value: !Ref RedisPort
-                -   Name: busybox
-                    Cpu: 10
-                    Command: ['/bin/sh -c "while true; do echo ''<html> <head> <title>Amazon ECS EC2
-                    Sample App</title> <style>body {margin-top: 40px; background-color: #333;}
-                    </style> </head><body> <div style=color:white;text-align:center> <h1>Amazon
-                    ECS EC2 Sample App</h1> <h2>Congratulations!</h2> <p>Your application is now
-                    running on a container in Amazon ECS.</p>'' > top; /bin/date > date ;
-                    echo ''</div></body></html>'' > bottom; cat top date bottom > /usr/local/apache2/htdocs/index.html
-                    ; sleep 1; done"']
-                    EntryPoint: [sh, -c]
-                    Essential: false
-                    Image: busybox
-                    Memory: 200
-                    LogConfiguration:
-                        LogDriver: awslogs
-                        Options:
-                            awslogs-group: !Ref 'CloudwatchLogsGroup'
-                            awslogs-region: !Ref 'AWS::Region'
-                            awslogs-stream-prefix: ecs-demo-app
-                    VolumesFrom:
-                        -   SourceContainer: simple-app
-            Volumes:
-                -   Name: my-vol
 
     CloudwatchLogsGroup:
         Type: AWS::Logs::LogGroup
