@@ -92,12 +92,12 @@ Resources:
                   PropagateAtLaunch: true
         CreationPolicy:
             ResourceSignal:
-                Timeout: PT2M
+                Timeout: PT5M
         UpdatePolicy:
             AutoScalingRollingUpdate:
                 MinInstancesInService: 1
                 MaxBatchSize: 1
-                PauseTime: PT2M
+                PauseTime: PT5M
                 WaitOnResourceSignals: true
 
     ScaleUpPolicy:

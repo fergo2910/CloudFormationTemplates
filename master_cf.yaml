@@ -176,6 +176,7 @@ Resources:
   #LaunchConfiguration is set to the mappings amis
     STACKECS:
         Type: AWS::CloudFormation::Stack
+        DependsOn: STACKELB
         Properties:
             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/ecs.yaml
             Parameters:
@@ -196,6 +197,7 @@ Resources:
 #You can provide a new instance for the deployment if needed.
     STACKDB:
         Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
         Properties:
             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/rds.yml
             Parameters:
@@ -215,6 +217,7 @@ Resources:
 #This template is for a cache instance of redis
     STACKCACHE:
         Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
         Properties:
             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/cache_db.yaml
             Parameters:

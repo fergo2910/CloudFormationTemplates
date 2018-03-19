@@ -38,6 +38,7 @@ Resources:
 
     CacheCluster:
         Type: "AWS::ElastiCache::CacheCluster"
+        DependsOn: SubnetGroup
         Properties:
             CacheNodeType: !Ref CacheNodeType
             CacheSubnetGroupName: !Sub ${EnvironmentName}-CSN
