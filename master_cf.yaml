@@ -108,7 +108,7 @@ Resources:
     VPC:
         Type: AWS::CloudFormation::Stack
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/vpc.yaml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/vpc.yaml
             Parameters:
                 EnvironmentName:    !Ref AWS::StackName
                 VpcCIDR:            10.24.0.0/16
@@ -120,48 +120,28 @@ Resources:
 #Secutiry Group
 #Services that allow us to enable trafic through ports/protocols
     STACKSG:
-        Type: AWS::EC2::SecurityGroup
+        Type: AWS::CloudFormation::Stack
+        DependsOn: VPC
         Properties:
-            VpcId: !GetAtt VPC.Outputs.VPC
-            GroupDescription: SG for production enviroment
-            SecurityGroupIngress:
-                -   IpProtocol: tcp
-                    FromPort: '443'
-                    ToPort: '443'
-                    CidrIp: "0.0.0.0/0"
-                -   IpProtocol: tcp
-                    FromPort: '80'
-                    ToPort: '80'
-                    CidrIp: "0.0.0.0/0"
-            Tags:
-                -   Key: Name
-                    Value: !Sub ${AWS::StackName}-Client
-
-    STACKSGECS:
-        Type: AWS::EC2::SecurityGroup
-        Properties:
-            VpcId: !GetAtt VPC.Outputs.VPC
-            GroupDescription: SG for ELB TO EC2
-            SecurityGroupIngress:
-                -   IpProtocol: -1
-                    SourceSecurityGroupId: !Ref STACKSG
-            Tags:
-                -   Key: Name
-                    Value: !Sub ${AWS::StackName}-Client
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/vpc-sg.yaml
+            Parameters:
+                VPC: !GetAtt VPC.Outputs.VPC
+                EnvironmentName: !Sub ${AWS::StackName}-client
 
 #Elastic Load Balancer
 #This template enable trafic listeners on ports 80 and 443
 #Set a default target group for all listener, but you have to define the target group for each service (see client service)
     STACKELB:
         Type: AWS::CloudFormation::Stack
+        DependsOn: STACKSG
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/elb.yaml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/elb.yaml
             Parameters:
                 EnvironmentName: !Sub ${AWS::StackName}-client
                 VPC: !GetAtt VPC.Outputs.VPC
                 Subnets: !GetAtt VPC.Outputs.PublicSubnets
                 CertificateArn: !Ref CertificateARN
-                SecurityGroup: !Ref STACKSG
+                SecurityGroup: !GetAtt STACKSG.Outputs.PublicSG
 
 #Cluster
 #This template creates a cluster with custom amis.
@@ -178,14 +158,14 @@ Resources:
         Type: AWS::CloudFormation::Stack
         DependsOn: STACKELB
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/ecs.yaml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ecs.yaml
             Parameters:
                 EnvironmentName: !Sub ${AWS::StackName}-client
                 InstanceType: !Ref InstanceType
                 MaxSize: !Ref MaxSize
                 MinSize: !Ref MinSize
                 VPC: !GetAtt VPC.Outputs.VPC
-                SecurityGroup: !Ref STACKSGECS
+                SecurityGroup: !GetAtt STACKSG.Outputs.PrivateSG
                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
                 KeyPair: !Ref KeyPair
                 Desired: !Ref DesiredSize
@@ -199,12 +179,12 @@ Resources:
         Type: AWS::CloudFormation::Stack
         DependsOn: STACKECS
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/rds.yml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/rds.yaml
             Parameters:
                 EnvironmentName: !Sub ${AWS::StackName}-client
                 VPC: !GetAtt VPC.Outputs.VPC
                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-                VPCSecurityGroups: !Ref STACKSGECS
+                VPCSecurityGroups: !GetAtt STACKSG.Outputs.PrivateSG
                 Engine: !Ref DBEngine
                 DBName: !Ref DBName
                 DBInstanceIdentifier: !Ref DBInstanceIdentifier
@@ -219,7 +199,7 @@ Resources:
         Type: AWS::CloudFormation::Stack
         DependsOn: STACKECS
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/cache_db.yaml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/ec_redis.yaml
             Parameters:
                 EnvironmentName: !Sub ${AWS::StackName}-client
                 CacheNodeType: !Ref CacheNodeType
@@ -227,7 +207,7 @@ Resources:
                 Engine: !Ref CacheEngine
                 NumCacheNodes: !Ref CacheNumCacheNodes
                 VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-                VPCSecurityGroupsIds: !Ref STACKSGECS
+                VPCSecurityGroupsIds: !GetAtt STACKSG.Outputs.PrivateSG
 
 #Client service
 #this template is for a standar client service.
@@ -236,8 +216,9 @@ Resources:
   #ImageTag - Image tag would search for an ami version with this tag
     ClientService:
         Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/generalized_templates/client.yaml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/services/django_website/service.yaml
             Parameters:
                 VPC: !GetAtt VPC.Outputs.VPC
                 LoadBalancer: !GetAtt STACKELB.Outputs.LoadBalancer

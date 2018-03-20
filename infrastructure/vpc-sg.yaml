@@ -1,0 +1,54 @@
+Description: >
+    ECS templates generalized.
+
+Parameters:
+    VPC:
+        Description: VPC where the security groups will be added
+        Type: String
+
+    EnvironmentName:
+        Description: Enviroment for the resources
+        Type: String
+
+Resources:
+
+#Secutiry Group
+#Services that allow us to enable trafic through ports/protocols
+    PublicSG:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            VpcId: !Ref VPC
+            GroupDescription: SG for production enviroment
+            SecurityGroupIngress:
+                -   IpProtocol: tcp
+                    FromPort: '443'
+                    ToPort: '443'
+                    CidrIp: "0.0.0.0/0"
+                -   IpProtocol: tcp
+                    FromPort: '80'
+                    ToPort: '80'
+                    CidrIp: "0.0.0.0/0"
+            Tags:
+                -   Key: Name
+                    Value: !Ref EnvironmentName
+
+    PrivateSG:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            VpcId: !Ref VPC
+            GroupDescription: SG for ELB TO EC2
+            SecurityGroupIngress:
+                -   IpProtocol: -1
+                    SourceSecurityGroupId: !Ref PublicSG
+            Tags:
+                -   Key: Name
+                    Value: !Ref EnvironmentName
+
+Outputs:
+    PublicSG:
+        Description: Security group for the outside network trafic
+        Value: !Ref PublicSG
+
+    PrivateSG:
+        Description: Security group for the internal network trafic
+        Value: !Ref PrivateSG
