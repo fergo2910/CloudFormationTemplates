@@ -1,0 +1,133 @@
+Description: >
+    This is an example of a long running ECS service that needs to connect to another ECS service (product-service)
+    via it's load balancer. We use environment variables to pass the URL of the product-service to this one's container(s).
+
+Parameters:
+
+    VPC:
+        Description: The VPC that the ECS cluster is deployed to
+        Type: String
+
+    LoadBalancer:
+        Description: The Load balancer for Auto Scaling Service
+        Type: String
+
+    Cluster:
+        Description: Please provide the ECS Cluster ID that this service should run on
+        Type: String
+
+    DesiredCount:
+        Description: How many instances of this task should we run across our cluster?
+        Type: Number
+        Default: 1
+
+    HttpListener:
+        Description: The Application Load Balancer listener to register with
+        Type: String
+
+    DBName:
+        Type: String
+
+    DBUser:
+        Type: String
+
+    DBURL:
+        Type: String
+
+    DBPort:
+        Type: String
+
+    RedisHost:
+        Type: String
+
+    RedisPort:
+        Type: String
+
+    ImageTag:
+        Description: The tag to be used
+        Type: String
+
+    Path:
+        Description: The path to register with the Application Load Balancer
+        Type: String
+        Default: /*
+
+Resources:
+    ServiceResources:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ECS/Master/service.yaml
+            Parameters:
+                VPC: !Ref VPC
+                HttpListener: !Ref HttpListener
+                Path: !Ref Path
+                StackName: !Ref AWS::StackName
+
+    TaskDefinition:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            Family: !Join ['', [!Ref 'AWS::StackName', -ecs-demo-app]]
+            ContainerDefinitions:
+                -   Name: simple-app
+                    Command:
+                        -   "/bin/bash"
+                        -   "-c"
+                        -   "python3 manage.py runserver 0.0.0.0:80"
+                    Cpu: '10'
+                    Essential: 'true'
+                    Image: !Sub 202279780353.dkr.ecr.us-east-1.amazonaws.com/general_image:${ImageTag}
+                    Memory: '300'
+                    LogConfiguration:
+                        LogDriver: awslogs
+                        Options:
+                            awslogs-group: !GetAtt ServiceResources.Outputs.CloudwatchLogsGroup
+                            awslogs-region: !Ref AWS::Region
+                            awslogs-stream-prefix: ecs-demo-app
+                    PortMappings:
+                        -   ContainerPort: 80
+                    Environment:
+                        -   Name: DBName
+                            Value: !Ref DBName
+                        -   Name: DBUser
+                            Value: !Ref DBUser
+                        -   Name: DBURL
+                            Value: !Ref DBURL
+                        -   Name: DBPort
+                            Value: !Ref DBPort
+                        -   Name: RedisHost
+                            Value: !Ref RedisHost
+                        -   Name: RedisPort
+                            Value: !Ref RedisPort
+
+    Service:
+        Type: AWS::ECS::Service
+        Properties:
+            Cluster: !Ref Cluster
+            Role: !GetAtt ServiceResources.Outputs.ServiceRole
+            DesiredCount: !Ref DesiredCount
+            TaskDefinition: !Ref TaskDefinition
+            LoadBalancers:
+            -   ContainerName: simple-app
+                ContainerPort: '80'
+                TargetGroupArn: !GetAtt ServiceResources.Outputs.TargetGroup
+
+    AutoScalingService:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ECS/AutoScaling/ServiceAutoScaling.yaml
+            Parameters:
+                Cluster: !Ref Cluster
+                ServiceName: !GetAtt Service.Name
+                MaxCapacity: 3
+                MinCapacity: 0
+                Cooldown: 60
+                MetricIntervalLowerBound: 0
+                ScalingAdjustment: 200
+
+    CloudWatchService:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ECS/CloudWatch/ServiceCloudWatch.yaml
+            Parameters:
+                ServiceScalingPolicy: !GetAtt AutoScalingService.Outputs.ServiceScalingPolicy
+                LoadBalancer: !Ref LoadBalancer

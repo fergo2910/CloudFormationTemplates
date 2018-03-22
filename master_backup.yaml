@@ -1,14 +1,6 @@
 Description: Stack templates generalized.
 
 Parameters:
-    CreateRepo:
-        Description: Create from stack a ECR Repository
-        Type: String
-        Default: false
-        AllowedValues:
-            -   true
-            -   false
-
     RepositoryName:
         Description: Name for a ECR Repository
         Type: String
@@ -37,7 +29,7 @@ Parameters:
         Default: t2.micro
         Type: String
 
-    Desired:
+    DesiredSize:
         Description: Desired number of EC2 Instances in the ASG cannot be less than MinSize
         Default: 1
         Type: Number
@@ -66,12 +58,6 @@ Parameters:
         Description: The value against which the specified statistic is compared for scaling down the AutoScalingGroup
         Default: 40
         Type: Number
-
-#service configuration
-    DesiredCount:
-        Description: How many instances of this task should we run across our cluster?
-        Type: Number
-        Default: 1
 
 #database parameters if you need one
     DBMasterUsername:
@@ -131,9 +117,6 @@ Parameters:
         Default: 1
         Type: Number
 
-Conditions:
-    CreateECR: !Equals [!Ref CreateRepo, true]
-
 Resources:
 
     VPC:
@@ -175,14 +158,13 @@ Resources:
                 SecurityGroup: !GetAtt STACKSG.Outputs.PublicSG
 
 #Cluster
-#This template creates alamrs for the cluster
+#This template creates a cluster with custom amis.
   #Scale up +1 instance when:
     #memory +98% for more than 1 minute
     #CPU +90% for more than 1 minute
   #Scale down -1 instance when:
     #memory 45% for more than 3 minutes
     #CPU 40% for more than 1 minute
-#This template creates a cluster with custom amis.
   #EC2 ROLE ECS ALLOW *
   #Mappings amis, identifier is region specific.
   #LaunchConfiguration is set to the mappings amis
@@ -190,57 +172,57 @@ Resources:
         Type: AWS::CloudFormation::Stack
         DependsOn: STACKELB
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ECS/Master/cluster.yaml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ecs.yaml
             Parameters:
                 EnvironmentName: !Sub ${AWS::StackName}-client
                 InstanceType: !Ref InstanceType
-                Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-                SecurityGroup: !GetAtt STACKSG.Outputs.PrivateSG
-                KeyPair: !Ref KeyPair
-                MinSize: !Ref MinSize
                 MaxSize: !Ref MaxSize
-                Desired: !Ref Desired
+                MinSize: !Ref MinSize
+                VPC: !GetAtt VPC.Outputs.VPC
+                SecurityGroup: !GetAtt STACKSG.Outputs.PrivateSG
+                Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+                KeyPair: !Ref KeyPair
+                Desired: !Ref DesiredSize
                 ScaleUpThreshold: !Ref ScaleUpThreshold
                 ScaleDownThreshold: !Ref ScaleDownThreshold
 
+#Database
+#this template is for a standar rds service.
+#You can provide a new instance for the deployment if needed.
+    STACKDB:
+        Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/rds.yaml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                VPC: !GetAtt VPC.Outputs.VPC
+                Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+                VPCSecurityGroups: !GetAtt STACKSG.Outputs.PrivateSG
+                Engine: !Ref DBEngine
+                DBName: !Ref DBName
+                DBInstanceIdentifier: !Ref DBInstanceIdentifier
+                MasterUsername: !Ref DBMasterUsername
+                MasterUserPassword: !Ref DBMasterUserPassword
+                DBInstanceClass: !Ref DBInstanceClass
+                AllocatedStorage: !Ref DBAllocatedStorage
 
-# #Database
-# #this template is for a standar rds service.
-# #You can provide a new instance for the deployment if needed.
-#     STACKDB:
-#         Type: AWS::CloudFormation::Stack
-#         DependsOn: STACKECS
-#         Properties:
-#             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/rds.yaml
-#             Parameters:
-#                 EnvironmentName: !Sub ${AWS::StackName}-client
-#                 VPC: !GetAtt VPC.Outputs.VPC
-#                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-#                 VPCSecurityGroups: !GetAtt STACKSG.Outputs.PrivateSG
-#                 Engine: !Ref DBEngine
-#                 DBName: !Ref DBName
-#                 DBInstanceIdentifier: !Ref DBInstanceIdentifier
-#                 MasterUsername: !Ref DBMasterUsername
-#                 MasterUserPassword: !Ref DBMasterUserPassword
-#                 DBInstanceClass: !Ref DBInstanceClass
-#                 AllocatedStorage: !Ref DBAllocatedStorage
-#
-# #Cache
-# #This template is for a cache instance of redis
-#     STACKCACHE:
-#         Type: AWS::CloudFormation::Stack
-#         DependsOn: STACKECS
-#         Properties:
-#             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/ec_redis.yaml
-#             Parameters:
-#                 EnvironmentName: !Sub ${AWS::StackName}-client
-#                 CacheNodeType: !Ref CacheNodeType
-#                 ClusterName: !Ref CacheClusterName
-#                 Engine: !Ref CacheEngine
-#                 NumCacheNodes: !Ref CacheNumCacheNodes
-#                 VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-#                 VPCSecurityGroupsIds: !GetAtt STACKSG.Outputs.PrivateSG
-#
+#Cache
+#This template is for a cache instance of redis
+    STACKCACHE:
+        Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/ec_redis.yaml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                CacheNodeType: !Ref CacheNodeType
+                ClusterName: !Ref CacheClusterName
+                Engine: !Ref CacheEngine
+                NumCacheNodes: !Ref CacheNumCacheNodes
+                VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
+                VPCSecurityGroupsIds: !GetAtt STACKSG.Outputs.PrivateSG
+
 #Client service
 #this template is for a standar client service.
 #Importan parameters:
@@ -248,33 +230,24 @@ Resources:
   #ImageTag - Image tag would search for an ami version with this tag
     ClientService:
         Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/services/django_website/django_webapp.yaml
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/services/django_website/service.yaml
             Parameters:
                 VPC: !GetAtt VPC.Outputs.VPC
                 LoadBalancer: !GetAtt STACKELB.Outputs.LoadBalancer
                 Cluster: !GetAtt STACKECS.Outputs.Cluster
-                DesiredCount: !Ref DesiredCount
+                DesiredCount: 1
                 HttpListener: !GetAtt STACKELB.Outputs.HttpListener
+                HttpsListener: dumy
                 DBName: !Ref DBName
                 DBUser: !Ref DBMasterUsername
-                # DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
-                # DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
-                # RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
-                # RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
-                DBURL: dumy
-                DBPort: dumy
-                RedisHost: dumy
-                RedisPort: dumy
+                DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
+                DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
+                RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
+                RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
                 ImageTag: !Ref ImageTag
-
-    ECRRepository:
-        Type: AWS::CloudFormation::Stack
-        Condition: CreateECR
-        Properties:
-            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/services/django_website/service.yaml
-            Parameters:
-                RepositoryName: !Ref RepositoryName
+                STACKENV: !Ref StackEnv
 
 Outputs:
     URL:

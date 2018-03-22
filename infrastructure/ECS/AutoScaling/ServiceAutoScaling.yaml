@@ -1,0 +1,67 @@
+Description: This template create an Aplication Auto Scaling for a service.
+
+Parameters:
+    Cluster:
+        Type: String
+    ServiceName:
+        Type: String
+    MaxCapacity:
+        Type: Number
+    MinCapacity:
+        Type: Number
+    Cooldown:
+        Type: Number
+    MetricIntervalLowerBound:
+        Type: Number
+    ScalingAdjustment:
+        Type: Number
+
+Resources:
+    ServiceScalingTarget:
+        Type: AWS::ApplicationAutoScaling::ScalableTarget
+        Properties:
+            MaxCapacity: !Ref MaxCapacity
+            MinCapacity: !Ref MinCapacity
+            ResourceId: !Join ['', [service/, !Ref Cluster, /, !Ref ServiceName]]
+            RoleARN: !GetAtt [AutoscalingRole, Arn]
+            ScalableDimension: ecs:service:DesiredCount
+            ServiceNamespace: ecs
+
+    ServiceScalingPolicy:
+        Type: AWS::ApplicationAutoScaling::ScalingPolicy
+        Properties:
+            PolicyName: AStepPolicy
+            PolicyType: StepScaling
+            ScalingTargetId: !Ref ServiceScalingTarget
+            StepScalingPolicyConfiguration:
+                AdjustmentType: PercentChangeInCapacity
+                Cooldown: !Ref Cooldown
+                MetricAggregationType: Average
+                StepAdjustments:
+                    -   MetricIntervalLowerBound: !Ref MetricIntervalLowerBound
+                        ScalingAdjustment: !Ref ScalingAdjustment
+
+    AutoscalingRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                    -   Effect: Allow
+                        Principal:
+                            Service: [application-autoscaling.amazonaws.com]
+                        Action: ['sts:AssumeRole']
+            Path: /
+            Policies:
+                -   PolicyName: service-autoscaling
+                    PolicyDocument:
+                        Statement:
+                            -   Effect: Allow
+                                Action: ['application-autoscaling:*', 'cloudwatch:DescribeAlarms', 'cloudwatch:PutMetricAlarm',
+                                'ecs:DescribeServices', 'ecs:UpdateService']
+                                Resource: '*'
+
+
+Outputs:
+    ServiceScalingPolicy:
+        Description: AWS::ApplicationAutoScaling::ScalingPolicy
+        Value: ServiceScalingPolicy

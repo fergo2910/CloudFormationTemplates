@@ -25,10 +25,6 @@ Parameters:
         Description: The Application Load Balancer listener to register with
         Type: String
 
-    HttpsListener:
-        Description: The Application Load Balancer listener to register with
-        Type: String
-
     DBName:
         Type: String
 
@@ -49,9 +45,6 @@ Parameters:
 
     ImageTag:
         Description: The tag to be used
-        Type: String
-
-    STACKENV:
         Type: String
 
     Path:
@@ -171,19 +164,6 @@ Resources:
             HealthyThresholdCount: 10
             UnhealthyThresholdCount: 10
 
-    # HttpsListenerRule:
-    #     Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    #     Properties:
-    #         ListenerArn: !Ref HttpsListener
-    #         Priority: 3
-    #         Conditions:
-    #             - Field: path-pattern
-    #               Values:
-    #                 - !Ref Path
-    #         Actions:
-    #             - TargetGroupArn: !Ref TargetGroup
-    #               Type: forward
-
     HttpListenerRule:
         Type: AWS::ElasticLoadBalancingV2::ListenerRule
         Properties:
@@ -253,3 +233,8 @@ Resources:
                                 Action: ['application-autoscaling:*', 'cloudwatch:DescribeAlarms', 'cloudwatch:PutMetricAlarm',
                                 'ecs:DescribeServices', 'ecs:UpdateService']
                                 Resource: '*'
+
+Outputs:
+    ServiceName:
+        Description: name of service
+        Value: !GetAtt Service.Name

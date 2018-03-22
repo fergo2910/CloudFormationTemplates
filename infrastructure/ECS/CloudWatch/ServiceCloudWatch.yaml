@@ -1,0 +1,24 @@
+Description: This template creates the CloudWatch services for a service
+
+Parameters:
+    ServiceScalingPolicy:
+        Type: String
+    LoadBalancer:
+        Type: String
+
+Resources:
+    HTTP500ScaleUpAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            EvaluationPeriods: '1'
+            Statistic: Average
+            Threshold: '10'
+            AlarmDescription: Alarm if our ELB generates too many HTTP 500s.
+            Period: '60'
+            AlarmActions: [!Ref 'ServiceScalingPolicy']
+            Namespace: AWS/CLIENT
+            ComparisonOperator: GreaterThanThreshold
+            MetricName: HTTPCode_ELB_5XX_Count
+            Dimensions:
+                -   Name: LoadBalancerName
+                    Value: !Ref LoadBalancer

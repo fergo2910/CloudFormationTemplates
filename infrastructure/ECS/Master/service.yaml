@@ -1,0 +1,90 @@
+Description: This template creates an ECS service
+
+Parameters:
+    VPC:
+        Type: String
+    HttpListener:
+        Type: String
+    Path:
+        Type: String
+    StackName:
+        Type: String
+
+
+Resources:
+    CloudwatchLogsGroup:
+        Type: AWS::Logs::LogGroup
+        Properties:
+            LogGroupName: !Ref StackName
+            RetentionInDays: 365
+
+    ServiceRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub ecs-service-${StackName}
+            Path: /
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": { "Service": [ "ecs.amazonaws.com" ]},
+                        "Action": [ "sts:AssumeRole" ]
+                    }]
+                }
+            Policies:
+                - PolicyName: !Sub ecs-service-${StackName}
+                  PolicyDocument:
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [{
+                                "Effect": "Allow",
+                                "Action": [
+                                    "ec2:AuthorizeSecurityGroupIngress",
+                                    "ec2:Describe*",
+                                    "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                                    "elasticloadbalancing:Describe*",
+                                    "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                                    "elasticloadbalancing:DeregisterTargets",
+                                    "elasticloadbalancing:DescribeTargetGroups",
+                                    "elasticloadbalancing:DescribeTargetHealth",
+                                    "elasticloadbalancing:RegisterTargets"
+                                ],
+                                "Resource": "*"
+                        }]
+                    }
+
+    TargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            VpcId: !Ref VPC
+            Port: 80
+            Protocol: HTTP
+            Matcher:
+                HttpCode: 200-499
+            HealthCheckPath: /
+            HealthCheckProtocol: HTTP
+            HealthCheckIntervalSeconds: 20
+            HealthCheckTimeoutSeconds: 10
+            HealthyThresholdCount: 10
+            UnhealthyThresholdCount: 10
+
+    HttpListenerRule:
+        Type: AWS::ElasticLoadBalancingV2::ListenerRule
+        Properties:
+            ListenerArn: !Ref HttpListener
+            Priority: 3
+            Conditions:
+                -   Field: path-pattern
+                    Values:
+                    -   !Ref Path
+            Actions:
+                -   TargetGroupArn: !Ref TargetGroup
+                    Type: forward
+
+Outputs:
+    CloudwatchLogsGroup:
+        Value: !Ref CloudwatchLogsGroup
+    ServiceRole:
+        Value: !Ref ServiceRole
+    TargetGroup:
+        Value: !Ref TargetGroup

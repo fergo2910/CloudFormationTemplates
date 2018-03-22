@@ -1,0 +1,80 @@
+Description: >
+    This master template deploys a ECS cluster with and AutoScalingGroup with Scale up/down policies and CloudWatch Alamrs of Memory and CPU. The AutoScaling comes with a LaunchConfiguration.
+
+Parameters:
+    EnvironmentName:
+        Description: An environment name that will be prefixed to resource names
+        Type: String
+
+    InstanceType:
+        Description: Which instance type should we use to build the ECS cluster?
+        Type: String
+
+    Subnets:
+        Description: Choose which subnets this ECS cluster should be deployed to
+        Type: String
+
+    SecurityGroup:
+        Description: Select the Security Group to use for the ECS cluster hosts
+        Type: String
+
+    KeyPair:
+        Description: Amazon EC2 Key Pair
+        Type: String
+
+    MinSize:
+        Type: Number
+        Description: Minimum number of ECS Instances in the ASG
+
+    MaxSize:
+        Type: Number
+        Description: Maximum number of EC2 Instances in the ASG
+
+    Desired:
+        Type: Number
+        Description: Desired dumber of EC2 Instances in the ASG cannot be less than MinSize
+
+    ScaleUpThreshold:
+        Type: Number
+        Description: The percentage of memory to scale up
+
+    ScaleDownThreshold:
+        Type: Number
+        Description: The percentage of memory to scale down
+
+Resources:
+    ECSAutoScaling:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ECS/AutoScaling/ClusterAutoScaling.yaml
+            Parameters:
+                Subnets: !Ref Subnets
+                MinSize: !Ref MinSize
+                MaxSize: !Ref MaxSize
+                Desired: !Ref Desired
+                EnvironmentName: !Ref EnvironmentName
+                InstanceType: !Ref InstanceType
+                KeyPair: !Ref KeyPair
+                SecurityGroup: !Ref SecurityGroup
+
+    ECSCluster:
+        Type: AWS::ECS::Cluster
+        Properties:
+            ClusterName: !Ref EnvironmentName
+
+    ECSCloudWatch:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/ECS/CloudWatch/ClusterCloudWatch.yaml
+            Parameters:
+                EnvironmentName: !Ref EnvironmentName
+                ECSCluster: !Ref ECSCluster
+                ScaleUpPolicy: !GetAtt ECSAutoScaling.Outputs.ScaleUpPolicy
+                ScaleDownPolicy: !GetAtt ECSAutoScaling.Outputs.ScaleDownPolicy
+                ScaleUpThreshold: !Ref ScaleUpThreshold
+                ScaleDownThreshold: !Ref ScaleDownThreshold
+
+Outputs:
+    Cluster:
+        Description: A reference to the ECS cluster
+        Value: !Ref ECSCluster

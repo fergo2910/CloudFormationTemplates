@@ -1,0 +1,89 @@
+Description: Cloud Watch Alamrs template
+
+Parameters:
+    EnvironmentName:
+        Type: String
+    ECSCluster:
+        Type: String
+    ScaleUpPolicy:
+        Type: String
+    ScaleDownPolicy:
+        Type: String
+    ScaleUpThreshold:
+        Type: Number
+    ScaleDownThreshold:
+        Type: Number
+
+
+Resources:
+    MemoryScaleUpAlarm:
+        Type: "AWS::CloudWatch::Alarm"
+        Properties:
+            ActionsEnabled: true
+            AlarmActions:
+                - !Ref ScaleUpPolicy
+            AlarmDescription: >
+                The MemoryReservation of the ECS cluster has exceeded 98% for more than
+                one minute. Breaching this alarm should trigger an ASG scale out.
+            ComparisonOperator: GreaterThanOrEqualToThreshold
+            Dimensions:
+                - Name: ClusterName
+                  Value: !Ref ECSCluster
+            EvaluationPeriods: "1"
+            MetricName: MemoryReservation
+            Namespace: AWS/ECS
+            Period: "60"
+            Statistic: Average
+            Threshold: !Ref ScaleUpThreshold
+            Unit: Percent
+
+    MemoryScaleDownAlarm:
+        Type: "AWS::CloudWatch::Alarm"
+        Properties:
+            ActionsEnabled: true
+            AlarmActions:
+            - !Ref ScaleDownPolicy
+            AlarmDescription: >
+                The MemoryReservation of the ECS cluster has dropped below 45% for more
+                than three minutes. Breaching this alarm should trigger an ASG scale in.
+            ComparisonOperator: LessThanOrEqualToThreshold
+            Dimensions:
+            - Name: ClusterName
+              Value: !Ref ECSCluster
+            EvaluationPeriods: "3"
+            MetricName: MemoryReservation
+            Namespace: AWS/ECS
+            Period: "60"
+            Statistic: Average
+            Threshold: !Ref ScaleDownThreshold
+            Unit: Percent
+
+    CPUScaleUpAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Scale Up ecs instance
+            ActionsEnabled: true
+            AlarmActions:
+                - Ref: ScaleUpPolicy
+            MetricName: CPUUtilization
+            Namespace: AWS/ECS
+            Statistic: Average
+            Period: '60'
+            EvaluationPeriods: '1'
+            Threshold: '90'
+            ComparisonOperator: GreaterThanThreshold
+
+    CPUScaleDownAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmDescription: Scale Down ecs instance
+            ActionsEnabled: true
+            AlarmActions:
+                - Ref: ScaleDownPolicy
+            MetricName: CPUUtilization
+            Namespace: AWS/ECS
+            Statistic: Average
+            Period: '60'
+            EvaluationPeriods: '1'
+            Threshold: '40'
+            ComparisonOperator: LessThanThreshold

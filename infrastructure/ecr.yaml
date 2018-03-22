@@ -1,0 +1,33 @@
+Description: This template creates a ECR Repository with all access
+
+Parameters:
+    RepositoryName:
+        Type: String
+
+Resources:
+    ECRRepository:
+        Type: "AWS::ECR::Repository"
+        Properties:
+            LifecyclePolicy:
+                LifecyclePolicyText: String
+                RegistryId: String
+            RepositoryName: !Ref RepositoryName
+            RepositoryPolicyText: JSON object
+            RepositoryPolicyText:
+                Version: "2018-03-21"
+                Statement:
+                    -   Sid: AllowPushPull
+                        Effect: Allow
+                        Principal: "*"
+                        Action:
+                            -   "ecr:GetDownloadUrlForLayer"
+                            -   "ecr:BatchGetImage"
+                            -   "ecr:BatchCheckLayerAvailability"
+                            -   "ecr:PutImage"
+                            -   "ecr:InitiateLayerUpload"
+                            -   "ecr:UploadLayerPart"
+                            -   "ecr:CompleteLayerUpload"
+
+Outputs:
+    Arn:
+        Value: !GetAtt ECRRepository.Arn

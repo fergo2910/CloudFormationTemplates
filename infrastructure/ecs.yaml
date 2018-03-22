@@ -40,11 +40,11 @@ Parameters:
         Type: Number
         Description: Desired dumber of EC2 Instances in the ASG cannot be less than MinSize
 
-    ScaleUpTreshold:
+    ScaleUpThreshold:
         Type: Number
         Description: The percentage of memory to scale up
 
-    ScaleDownTreshold:
+    ScaleDownThreshold:
         Type: Number
         Description: The percentage of memory to scale down
 
@@ -147,7 +147,7 @@ Resources:
             Namespace: AWS/ECS
             Period: "60"
             Statistic: Average
-            Threshold: !Ref ScaleUpTreshold
+            Threshold: !Ref ScaleUpThreshold
             Unit: Percent
 
     MemoryScaleDownAlarm:
@@ -168,7 +168,7 @@ Resources:
             Namespace: AWS/ECS
             Period: "60"
             Statistic: Average
-            Threshold: !Ref ScaleDownTreshold
+            Threshold: !Ref ScaleDownThreshold
             Unit: Percent
 
     CPUScaleUpAlarm:

@@ -1,0 +1,200 @@
+Description: AutoScalingGroup template
+
+Parameters:
+    Subnets:
+        Type: String
+    MinSize:
+        Type: Number
+    MaxSize:
+        Type: Number
+    Desired:
+        Type: Number
+    EnvironmentName:
+        Type: String
+    InstanceType:
+        Type: String
+    KeyPair:
+        Type: String
+    SecurityGroup:
+        Type: String
+
+Mappings:
+    AWSRegionToAMI:
+        us-east-1:
+            AMI: ami-ba722dc0
+        us-east-2:
+            AMI: ami-13af8476
+        us-west-1:
+            AMI: ami-9df0f0fd
+        us-west-2:
+            AMI: ami-c9c87cb1
+
+Resources:
+    AutoScalingGroup:
+        Type: AWS::AutoScaling::AutoScalingGroup
+        Properties:
+            VPCZoneIdentifier:
+                - !Ref Subnets
+            LaunchConfigurationName: !Ref LaunchConfiguration
+            MinSize: !Ref MinSize
+            MaxSize: !Ref MaxSize
+            DesiredCapacity: !Ref Desired
+            TerminationPolicies:
+                - Default
+            Tags:
+                - Key: Name
+                  Value: !Ref EnvironmentName
+                  PropagateAtLaunch: true
+        CreationPolicy:
+            ResourceSignal:
+                Timeout: PT5M
+        UpdatePolicy:
+            AutoScalingRollingUpdate:
+                MinInstancesInService: 1
+                MaxBatchSize: 1
+                PauseTime: PT5M
+                WaitOnResourceSignals: true
+
+    ScaleUpPolicy:
+        Type: AWS::AutoScaling::ScalingPolicy
+        Properties:
+            AdjustmentType: ChangeInCapacity
+            AutoScalingGroupName: !Ref AutoScalingGroup
+            EstimatedInstanceWarmup: 120
+            MetricAggregationType: Average
+            PolicyType: StepScaling
+            StepAdjustments:
+                -   MetricIntervalLowerBound: "0"
+                    ScalingAdjustment: "1"
+
+    ScaleDownPolicy:
+        Type: AWS::AutoScaling::ScalingPolicy
+        Properties:
+            AdjustmentType: ChangeInCapacity
+            AutoScalingGroupName: !Ref AutoScalingGroup
+            EstimatedInstanceWarmup: 120
+            MetricAggregationType: Average
+            PolicyType: StepScaling
+            StepAdjustments:
+                -   MetricIntervalUpperBound: "0"
+                    ScalingAdjustment: "-1"
+
+    LaunchConfiguration:
+        Type: AWS::AutoScaling::LaunchConfiguration
+        Properties:
+          ImageId: !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
+          InstanceType: !Ref InstanceType
+          KeyName: !Ref KeyPair
+          AssociatePublicIpAddress: true
+          SecurityGroups:
+              - !Ref SecurityGroup
+          IamInstanceProfile: !Ref ECSInstanceProfile
+          BlockDeviceMappings:
+              - DeviceName: "/dev/xvdcy"
+                Ebs:
+                    VolumeSize: "50"
+                    VolumeType: "gp2"
+          UserData:
+              Fn::Base64: !Sub |
+                    #!/bin/bash
+                    yum install -y python-pip
+                    pip-2.6 install awscli
+                    yum install -y aws-cfn-bootstrap
+                    yum install -y git
+                    vgextend docker /dev/xvdcy
+                    lvextend -L+100G /dev/docker/docker-pool
+                    /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource LaunchConfiguration
+                    /opt/aws/bin/cfn-signal -e 0 --region ${AWS::Region} --stack ${AWS::StackName} --resource AutoScalingGroup
+        Metadata:
+            AWS::CloudFormation::Init:
+                config:
+                    files:
+                        "/etc/cfn/cfn-hup.conf":
+                            mode: 000400
+                            owner: root
+                            group: root
+                            content: !Sub |
+                                [main]
+                                stack=${AWS::StackId}
+                                region=${AWS::Region}
+                        "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+                            mode: 000400
+                            owner: root
+                            group: root
+                            content: !Sub |
+                                [cfn-auto-reloader-hook]
+                                triggers=post.update
+                                path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
+                                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource LaunchConfiguration
+                    commands:
+                        01_add_instance_to_cluster:
+                            command: !Sub echo ECS_CLUSTER=${EnvironmentName} >> /etc/ecs/ecs.config
+                    services:
+                        sysvinit:
+                            cfn-hup:
+                                enabled: true
+                                ensureRunning: true
+                                files:
+                                    - /etc/cfn/cfn-hup.conf
+                                    - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+
+    ECSRole:
+        Type: AWS::IAM::Role
+        Properties:
+            Path: /
+            RoleName: !Sub ${EnvironmentName}-ECSRole-${AWS::Region}
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        }
+                    }]
+                }
+            Policies:
+                - PolicyName: ecs-service
+                  PolicyDocument: |
+                    {
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecs:CreateCluster",
+                                "ecs:DeregisterContainerInstance",
+                                "ecs:DiscoverPollEndpoint",
+                                "ecs:Poll",
+                                "ecs:RegisterContainerInstance",
+                                "ecs:StartTelemetrySession",
+                                "ecs:Submit*",
+                                "ecr:*",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents",
+                                "ecr:BatchCheckLayerAvailability",
+                                "ecr:BatchGetImage",
+                                "ecr:GetDownloadUrlForLayer",
+                                "ecr:GetAuthorizationToken"
+                            ],
+                            "Resource": "*"
+                        }]
+                    }
+
+    ECSInstanceProfile:
+        Type: AWS::IAM::InstanceProfile
+        Properties:
+            Path: /
+            Roles:
+                - !Ref ECSRole
+
+Outputs:
+    AutoScalingGroup:
+        Description: AWS::AutoScaling::AutoScalingGroup
+        Value: !Ref AutoScalingGroup
+
+    ScaleUpPolicy:
+        Description: AWS::AutoScaling::ScalingPolicy
+        Value: !Ref ScaleUpPolicy
+
+    ScaleDownPolicy:
+        Description: AWS::AutoScaling::ScalingPolicy
+        Value: !Ref ScaleDownPolicy
