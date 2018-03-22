@@ -14,6 +14,11 @@ Parameters:
         Type: String
         Default: general_image
 
+    IAMUser:
+        Description: ARN IAM user to have access to the Repository
+        Type: String
+        Default: arn:aws:iam::202279780353:user/giorgio
+
     CertificateARN:
         Description: Certificate of SSL for HTTPS
         Type: String
@@ -204,43 +209,43 @@ Resources:
                 ScaleDownThreshold: !Ref ScaleDownThreshold
 
 
-# #Database
-# #this template is for a standar rds service.
-# #You can provide a new instance for the deployment if needed.
-#     STACKDB:
-#         Type: AWS::CloudFormation::Stack
-#         DependsOn: STACKECS
-#         Properties:
-#             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/rds.yaml
-#             Parameters:
-#                 EnvironmentName: !Sub ${AWS::StackName}-client
-#                 VPC: !GetAtt VPC.Outputs.VPC
-#                 Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-#                 VPCSecurityGroups: !GetAtt STACKSG.Outputs.PrivateSG
-#                 Engine: !Ref DBEngine
-#                 DBName: !Ref DBName
-#                 DBInstanceIdentifier: !Ref DBInstanceIdentifier
-#                 MasterUsername: !Ref DBMasterUsername
-#                 MasterUserPassword: !Ref DBMasterUserPassword
-#                 DBInstanceClass: !Ref DBInstanceClass
-#                 AllocatedStorage: !Ref DBAllocatedStorage
-#
-# #Cache
-# #This template is for a cache instance of redis
-#     STACKCACHE:
-#         Type: AWS::CloudFormation::Stack
-#         DependsOn: STACKECS
-#         Properties:
-#             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/ec_redis.yaml
-#             Parameters:
-#                 EnvironmentName: !Sub ${AWS::StackName}-client
-#                 CacheNodeType: !Ref CacheNodeType
-#                 ClusterName: !Ref CacheClusterName
-#                 Engine: !Ref CacheEngine
-#                 NumCacheNodes: !Ref CacheNumCacheNodes
-#                 VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
-#                 VPCSecurityGroupsIds: !GetAtt STACKSG.Outputs.PrivateSG
-#
+#Database
+#this template is for a standar rds service.
+#You can provide a new instance for the deployment if needed.
+    STACKDB:
+        Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/rds.yaml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                VPC: !GetAtt VPC.Outputs.VPC
+                Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+                VPCSecurityGroups: !GetAtt STACKSG.Outputs.PrivateSG
+                Engine: !Ref DBEngine
+                DBName: !Ref DBName
+                DBInstanceIdentifier: !Ref DBInstanceIdentifier
+                MasterUsername: !Ref DBMasterUsername
+                MasterUserPassword: !Ref DBMasterUserPassword
+                DBInstanceClass: !Ref DBInstanceClass
+                AllocatedStorage: !Ref DBAllocatedStorage
+
+#Cache
+#This template is for a cache instance of redis
+    STACKCACHE:
+        Type: AWS::CloudFormation::Stack
+        DependsOn: STACKECS
+        Properties:
+            TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/infrastructure/databases/ec_redis.yaml
+            Parameters:
+                EnvironmentName: !Sub ${AWS::StackName}-client
+                CacheNodeType: !Ref CacheNodeType
+                ClusterName: !Ref CacheClusterName
+                Engine: !Ref CacheEngine
+                NumCacheNodes: !Ref CacheNumCacheNodes
+                VPCSubnetsIds: !GetAtt VPC.Outputs.PrivateSubnets
+                VPCSecurityGroupsIds: !GetAtt STACKSG.Outputs.PrivateSG
+
 #Client service
 #this template is for a standar client service.
 #Importan parameters:
@@ -258,14 +263,14 @@ Resources:
                 HttpListener: !GetAtt STACKELB.Outputs.HttpListener
                 DBName: !Ref DBName
                 DBUser: !Ref DBMasterUsername
-                # DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
-                # DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
-                # RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
-                # RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
-                DBURL: dumy
-                DBPort: dumy
-                RedisHost: dumy
-                RedisPort: dumy
+                DBURL: !GetAtt STACKDB.Outputs.DBEndpointAddress
+                DBPort: !GetAtt STACKDB.Outputs.DBEndpointPort
+                RedisHost: !GetAtt STACKCACHE.Outputs.EndpointAddress
+                RedisPort: !GetAtt STACKCACHE.Outputs.EndpointPort
+                # DBURL: dumy
+                # DBPort: dumy
+                # RedisHost: dumy
+                # RedisPort: dumy
                 ImageTag: !Ref ImageTag
 
     ECRRepository:
@@ -275,6 +280,7 @@ Resources:
             TemplateURL: https://s3.amazonaws.com/ferdinand-bucket/services/django_website/service.yaml
             Parameters:
                 RepositoryName: !Ref RepositoryName
+                IAMUser: !Ref IAMUser
 
 Outputs:
     URL:
